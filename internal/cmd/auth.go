@@ -20,8 +20,10 @@ var authCmd = &cobra.Command{
 	Short: "Manage authentication and API keys",
 	Long: `Manage authentication credentials and API keys for the Kalshi API.
 
+API keys are provisioned by Kalshi through their dashboard.
+
 The auth commands allow you to:
-  - Log in with a new RSA key pair
+  - Log in with your Kalshi-provisioned API credentials
   - Log out and clear stored credentials
   - Check authentication status
   - Manage API keys`,
@@ -30,15 +32,18 @@ The auth commands allow you to:
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Authenticate with Kalshi",
-	Long: `Authenticate with Kalshi by generating an RSA key pair.
+	Long: `Authenticate with Kalshi using your API credentials.
+
+API keys are provisioned by Kalshi. To get your credentials:
+  1. Go to https://kalshi.com/account/api (or demo: https://demo.kalshi.com/account/api)
+  2. Click "Generate API Key"
+  3. Save the API Key ID and Private Key (shown only once!)
 
 This command will:
-  1. Check if you're already logged in
-  2. Generate a new 4096-bit RSA key pair
-  3. Display the public key for you to add to your Kalshi dashboard
-  4. Prompt you for the API key ID after you've added the key
-  5. Store your credentials securely in the system keyring
-  6. Test the authentication`,
+  1. Prompt for your API Key ID
+  2. Prompt for your Private Key (paste PEM or provide file path)
+  3. Store credentials securely in the system keyring
+  4. Test the authentication`,
 	RunE: runLogin,
 }
 
@@ -115,7 +120,7 @@ func runLogin(cmd *cobra.Command, args []string) error {
 			fmt.Println()
 
 			if !SkipConfirmation() {
-				fmt.Print("Do you want to log out and create new credentials? [y/N]: ")
+				fmt.Print("Do you want to log out and enter new credentials? [y/N]: ")
 				reader := bufio.NewReader(os.Stdin)
 				response, _ := reader.ReadString('\n')
 				response = strings.TrimSpace(strings.ToLower(response))
@@ -131,33 +136,18 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Println(ui.TitleStyle.Render("Generating RSA Key Pair"))
+	fmt.Println(ui.TitleStyle.Render("Kalshi API Authentication"))
+	fmt.Println()
+	fmt.Println("API keys are provisioned by Kalshi. If you don't have credentials yet:")
+	fmt.Println("  1. Go to https://kalshi.com/account/api (or demo: https://demo.kalshi.com/account/api)")
+	fmt.Println("  2. Click 'Generate API Key'")
+	fmt.Println("  3. Save the API Key ID and Private Key (shown only once!)")
 	fmt.Println()
 
-	privateKey, err := api.GenerateKeyPair()
-	if err != nil {
-		return fmt.Errorf("failed to generate key pair: %w", err)
-	}
-
-	publicKeyPEM, err := api.EncodePublicKeyPEM(&privateKey.PublicKey)
-	if err != nil {
-		return fmt.Errorf("failed to encode public key: %w", err)
-	}
-
-	fmt.Println("A new RSA key pair has been generated.")
-	fmt.Println()
-	fmt.Println(ui.HeaderStyle.Render("Public Key:"))
-	fmt.Println(publicKeyPEM)
-	fmt.Println()
-	fmt.Println(ui.BoldStyle.Render("Next Steps:"))
-	fmt.Println("1. Copy the public key above")
-	fmt.Println("2. Go to your Kalshi dashboard: https://kalshi.com/account/api")
-	fmt.Println("3. Click 'Add API Key' and paste the public key")
-	fmt.Println("4. Copy the API Key ID provided by Kalshi")
-	fmt.Println()
-
-	fmt.Print("Enter your API Key ID: ")
 	reader := bufio.NewReader(os.Stdin)
+
+	// Get API Key ID
+	fmt.Print("Enter your API Key ID: ")
 	apiKeyID, err := reader.ReadString('\n')
 	if err != nil {
 		return fmt.Errorf("failed to read input: %w", err)
@@ -168,11 +158,30 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("API Key ID is required")
 	}
 
-	privateKeyPEM := api.EncodePrivateKeyPEM(privateKey)
+	// Get Private Key (file path or paste)
+	fmt.Println()
+	fmt.Println("Enter your Private Key (paste PEM content or provide file path):")
+	fmt.Println("(If pasting, enter the full PEM including BEGIN/END lines, then press Enter twice)")
+	fmt.Println()
+
+	privateKeyPEM, err := readPrivateKeyInput(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read private key: %w", err)
+	}
+
+	if privateKeyPEM == "" {
+		return fmt.Errorf("private key is required")
+	}
 
 	creds := config.Credentials{
 		APIKeyID:   apiKeyID,
 		PrivateKey: privateKeyPEM,
+	}
+
+	// Validate the private key can be parsed
+	_, err = api.NewSignerFromPEM(creds.APIKeyID, creds.PrivateKey)
+	if err != nil {
+		return fmt.Errorf("invalid private key format: %w", err)
 	}
 
 	if err := keyring.SaveCredentials(creds); err != nil {
@@ -208,6 +217,50 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Environment: %s\n", cfg.Environment())
 
 	return nil
+}
+
+// readPrivateKeyInput reads a private key from stdin (multi-line PEM) or a file path
+func readPrivateKeyInput(reader *bufio.Reader) (string, error) {
+	var lines []string
+	emptyLineCount := 0
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+
+		trimmed := strings.TrimSpace(line)
+
+		// Check if it's a file path (first non-empty line, doesn't start with -----)
+		if len(lines) == 0 && trimmed != "" && !strings.HasPrefix(trimmed, "-----") {
+			// Try to read as file path
+			if content, err := os.ReadFile(trimmed); err == nil {
+				return string(content), nil
+			}
+			// Not a valid file, treat as start of PEM content
+		}
+
+		// Track empty lines to detect end of input
+		if trimmed == "" {
+			emptyLineCount++
+			if emptyLineCount >= 2 {
+				break
+			}
+		} else {
+			emptyLineCount = 0
+		}
+
+		lines = append(lines, line)
+
+		// Check if we've reached the end of a PEM block
+		if strings.HasPrefix(trimmed, "-----END") {
+			break
+		}
+	}
+
+	result := strings.Join(lines, "")
+	return strings.TrimSpace(result), nil
 }
 
 func runLogout(cmd *cobra.Command, args []string) error {
