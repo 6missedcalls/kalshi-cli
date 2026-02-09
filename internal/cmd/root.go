@@ -20,6 +20,10 @@ var (
 	verbose   bool
 	cfg       *config.Config
 	outputFmt ui.OutputFormat
+
+	buildVersion = "dev"
+	buildCommit  = "none"
+	buildDate    = "unknown"
 )
 
 var rootCmd = &cobra.Command{
@@ -103,4 +107,26 @@ func PrintSuccess(msg string) {
 
 func PrintWarning(msg string) {
 	fmt.Println(ui.WarningStyle.Render(msg))
+}
+
+// SetVersionInfo is called from main to inject build-time variables.
+func SetVersionInfo(version, commit, date string) {
+	buildVersion = version
+	buildCommit = commit
+	buildDate = date
+	rootCmd.Version = version
+}
+
+func init() {
+	rootCmd.AddCommand(versionCmd)
+}
+
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Print version information",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Printf("kalshi-cli %s\n", buildVersion)
+		fmt.Printf("  commit:  %s\n", buildCommit)
+		fmt.Printf("  built:   %s\n", buildDate)
+	},
 }

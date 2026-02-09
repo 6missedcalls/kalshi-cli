@@ -6,7 +6,7 @@
 *.dylib
 *.test
 *.out
-kalshi-cli
+/kalshi-cli
 
 # Build output
 dist/
