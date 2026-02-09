@@ -1,0 +1,105 @@
+version: 2
+
+project_name: kalshi-cli
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - id: kalshi-cli
+    main: ./cmd/kalshi-cli
+    binary: kalshi-cli
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+      - -X main.builtBy=goreleaser
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+      - Merge pull request
+      - Merge branch
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: Performance
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Refactoring
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: Other
+      order: 999
+
+brews:
+  - name: kalshi-cli
+    repository:
+      owner: 6missedcalls
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    commit_msg_template: "chore: update {{ .ProjectName }} to {{ .Tag }}"
+    directory: Formula
+    homepage: "https://github.com/6missedcalls/kalshi-cli"
+    description: "CLI for the Kalshi prediction market exchange"
+    license: "MIT"
+    install: |
+      bin.install "kalshi-cli"
+    test: |
+      system "#{bin}/kalshi-cli", "--help"
+
+release:
+  github:
+    owner: 6missedcalls
+    name: kalshi-cli
+  draft: false
+  prerelease: auto
+  mode: replace
+  name_template: "{{.ProjectName}} v{{.Version}}"
