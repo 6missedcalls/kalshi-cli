@@ -51,36 +51,10 @@ brew install 6missedcalls/tap/kalshi-cli
 
 ### Go Install
 
-Requires Go 1.21+:
+Requires Go 1.25+:
 
 ```bash
 go install github.com/6missedcalls/kalshi-cli/cmd/kalshi-cli@latest
-```
-
-### Binary Download
-
-Download the latest release for your platform:
-
-```bash
-# macOS (Apple Silicon)
-curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_darwin_arm64.tar.gz
-tar -xzf kalshi-cli_darwin_arm64.tar.gz
-sudo mv kalshi-cli /usr/local/bin/
-
-# macOS (Intel)
-curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_darwin_amd64.tar.gz
-tar -xzf kalshi-cli_darwin_amd64.tar.gz
-sudo mv kalshi-cli /usr/local/bin/
-
-# Linux (x86_64)
-curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_linux_amd64.tar.gz
-tar -xzf kalshi-cli_linux_amd64.tar.gz
-sudo mv kalshi-cli /usr/local/bin/
-
-# Linux (ARM64)
-curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_linux_arm64.tar.gz
-tar -xzf kalshi-cli_linux_arm64.tar.gz
-sudo mv kalshi-cli /usr/local/bin/
 ```
 
 ### Build from Source
@@ -607,7 +581,7 @@ kalshi-cli/
 │   └── websocket/         # WebSocket client, channels, message routing
 ├── pkg/
 │   └── models/            # Shared request/response types
-├── .goreleaser.yml        # Cross-platform release builds
+├── .goreleaser.yaml       # Cross-platform release builds
 ├── go.mod
 └── go.sum
 ```
