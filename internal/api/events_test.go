@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/6missedcalls/kalshi-cli/pkg/models"
 )
@@ -378,6 +379,336 @@ func TestGetMultivariateEvent(t *testing.T) {
 
 			if resp.Ticker != tt.ticker {
 				t.Errorf("expected ticker %q, got %q", tt.ticker, resp.Ticker)
+			}
+		})
+	}
+}
+
+func TestGetEventCandlesticks(t *testing.T) {
+	tests := []struct {
+		name           string
+		params         CandlesticksParams
+		serverResponse models.CandlesticksResponse
+		serverStatus   int
+		wantErr        bool
+		wantCount      int
+	}{
+		{
+			name: "returns candlesticks successfully",
+			params: CandlesticksParams{
+				Ticker: "ELECTION-2024",
+				Period: "1h",
+			},
+			serverResponse: models.CandlesticksResponse{
+				Candlesticks: []models.Candlestick{
+					{Ticker: "ELECTION-2024", Open: 50, High: 55, Low: 48, Close: 52, Volume: 1000, OpenInterest: 500},
+					{Ticker: "ELECTION-2024", Open: 52, High: 58, Low: 51, Close: 56, Volume: 1200, OpenInterest: 550},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+			wantCount:    2,
+		},
+		{
+			name: "returns candlesticks with time range",
+			params: CandlesticksParams{
+				Ticker:    "FED-MAR-2024",
+				Period:    "15m",
+				StartTime: func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
+				EndTime:   func() *time.Time { t := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC); return &t }(),
+			},
+			serverResponse: models.CandlesticksResponse{
+				Candlesticks: []models.Candlestick{
+					{Ticker: "FED-MAR-2024", Open: 45, High: 50, Low: 44, Close: 49, Volume: 800, OpenInterest: 400},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+			wantCount:    1,
+		},
+		{
+			name: "returns empty candlesticks for no data",
+			params: CandlesticksParams{
+				Ticker: "NO-DATA-EVENT",
+				Period: "1d",
+			},
+			serverResponse: models.CandlesticksResponse{
+				Candlesticks: []models.Candlestick{},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+			wantCount:    0,
+		},
+		{
+			name: "handles not found error",
+			params: CandlesticksParams{
+				Ticker: "INVALID-EVENT",
+				Period: "1h",
+			},
+			serverResponse: models.CandlesticksResponse{},
+			serverStatus:   http.StatusNotFound,
+			wantErr:        true,
+		},
+		{
+			name: "handles server error",
+			params: CandlesticksParams{
+				Ticker: "ERROR-EVENT",
+				Period: "1h",
+			},
+			serverResponse: models.CandlesticksResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET request, got %s", r.Method)
+				}
+
+				expectedPath := TradeAPIPrefix + "/events/" + tt.params.Ticker + "/candlesticks"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				if tt.params.Period != "" {
+					if got := r.URL.Query().Get("period"); got != tt.params.Period {
+						t.Errorf("expected period=%s, got %s", tt.params.Period, got)
+					}
+				}
+
+				if tt.params.StartTime != nil {
+					if got := r.URL.Query().Get("start_ts"); got == "" {
+						t.Error("expected start_ts query param")
+					}
+				}
+
+				if tt.params.EndTime != nil {
+					if got := r.URL.Query().Get("end_ts"); got == "" {
+						t.Error("expected end_ts query param")
+					}
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			candlesticks, err := client.GetEventCandlesticks(context.Background(), tt.params)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(candlesticks) != tt.wantCount {
+				t.Errorf("expected %d candlesticks, got %d", tt.wantCount, len(candlesticks))
+			}
+		})
+	}
+}
+
+func TestGetEventMetadata(t *testing.T) {
+	tests := []struct {
+		name           string
+		ticker         string
+		serverResponse models.EventMetadataResponse
+		serverStatus   int
+		wantErr        bool
+	}{
+		{
+			name:   "returns event metadata successfully",
+			ticker: "ELECTION-2024",
+			serverResponse: models.EventMetadataResponse{
+				EventMetadata: models.EventMetadata{
+					EventTicker: "ELECTION-2024",
+					Metadata: map[string]string{
+						"source":      "AP News",
+						"resolution":  "Official election results",
+						"last_update": "2024-11-05T00:00:00Z",
+					},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+		},
+		{
+			name:           "handles not found",
+			ticker:         "INVALID-EVENT",
+			serverResponse: models.EventMetadataResponse{},
+			serverStatus:   http.StatusNotFound,
+			wantErr:        true,
+		},
+		{
+			name:           "handles server error",
+			ticker:         "ERROR-EVENT",
+			serverResponse: models.EventMetadataResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET request, got %s", r.Method)
+				}
+
+				expectedPath := TradeAPIPrefix + "/events/" + tt.ticker + "/metadata"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			resp, err := client.GetEventMetadata(context.Background(), tt.ticker)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if resp.EventTicker != tt.ticker {
+				t.Errorf("expected event ticker %q, got %q", tt.ticker, resp.EventTicker)
+			}
+		})
+	}
+}
+
+func TestGetForecastPercentileHistory(t *testing.T) {
+	tests := []struct {
+		name           string
+		params         ForecastPercentileHistoryParams
+		serverResponse models.ForecastPercentileHistoryResponse
+		serverStatus   int
+		wantErr        bool
+		wantCount      int
+	}{
+		{
+			name: "returns forecast history successfully",
+			params: ForecastPercentileHistoryParams{
+				Ticker: "ELECTION-2024",
+			},
+			serverResponse: models.ForecastPercentileHistoryResponse{
+				History: []models.ForecastPercentilePoint{
+					{Timestamp: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), P10: 40, P25: 45, P50: 50, P75: 55, P90: 60},
+					{Timestamp: time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC), P10: 42, P25: 47, P50: 52, P75: 57, P90: 62},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+			wantCount:    2,
+		},
+		{
+			name: "returns forecast history with time range",
+			params: ForecastPercentileHistoryParams{
+				Ticker:    "FED-MAR-2024",
+				StartTime: func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
+				EndTime:   func() *time.Time { t := time.Date(2024, 1, 31, 0, 0, 0, 0, time.UTC); return &t }(),
+			},
+			serverResponse: models.ForecastPercentileHistoryResponse{
+				History: []models.ForecastPercentilePoint{
+					{Timestamp: time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC), P10: 35, P25: 40, P50: 45, P75: 50, P90: 55},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+			wantCount:    1,
+		},
+		{
+			name: "handles not found",
+			params: ForecastPercentileHistoryParams{
+				Ticker: "INVALID-EVENT",
+			},
+			serverResponse: models.ForecastPercentileHistoryResponse{},
+			serverStatus:   http.StatusNotFound,
+			wantErr:        true,
+		},
+		{
+			name: "handles server error",
+			params: ForecastPercentileHistoryParams{
+				Ticker: "ERROR-EVENT",
+			},
+			serverResponse: models.ForecastPercentileHistoryResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET request, got %s", r.Method)
+				}
+
+				expectedPath := TradeAPIPrefix + "/events/" + tt.params.Ticker + "/forecast-percentile-history"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				if tt.params.StartTime != nil {
+					if got := r.URL.Query().Get("start_ts"); got == "" {
+						t.Error("expected start_ts query param")
+					}
+				}
+
+				if tt.params.EndTime != nil {
+					if got := r.URL.Query().Get("end_ts"); got == "" {
+						t.Error("expected end_ts query param")
+					}
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			history, err := client.GetForecastPercentileHistory(context.Background(), tt.params)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(history) != tt.wantCount {
+				t.Errorf("expected %d history points, got %d", tt.wantCount, len(history))
 			}
 		})
 	}

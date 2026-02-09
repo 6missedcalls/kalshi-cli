@@ -175,7 +175,7 @@ func (c *Client) CreateSubaccount(ctx context.Context) (*models.Subaccount, erro
 
 // GetTransfers returns all subaccount transfers
 func (c *Client) GetTransfers(ctx context.Context) (*models.TransfersResponse, error) {
-	path := portfolioBasePath + "/transfers"
+	path := portfolioBasePath + "/subaccounts/transfers"
 
 	var result models.TransfersResponse
 	if err := c.GetJSON(ctx, path, &result); err != nil {
@@ -186,10 +186,32 @@ func (c *Client) GetTransfers(ctx context.Context) (*models.TransfersResponse, e
 
 // Transfer creates a transfer between subaccounts
 func (c *Client) Transfer(ctx context.Context, req models.TransferRequest) (*models.Transfer, error) {
-	path := portfolioBasePath + "/transfers"
+	path := portfolioBasePath + "/subaccounts/transfers"
 
 	var result models.Transfer
 	if err := c.PostJSON(ctx, path, req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetSubaccountBalances returns all subaccount balances
+func (c *Client) GetSubaccountBalances(ctx context.Context) (*models.SubaccountBalancesResponse, error) {
+	path := portfolioBasePath + "/subaccounts/balances"
+
+	var result models.SubaccountBalancesResponse
+	if err := c.GetJSON(ctx, path, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GetRestingOrderValue returns the total resting order value (FCM only)
+func (c *Client) GetRestingOrderValue(ctx context.Context) (*models.RestingOrderValueResponse, error) {
+	path := portfolioBasePath + "/resting-order-value"
+
+	var result models.RestingOrderValueResponse
+	if err := c.GetJSON(ctx, path, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -692,4 +694,330 @@ func newTestSigner(t *testing.T) *Signer {
 		t.Fatalf("failed to create signer: %v", err)
 	}
 	return signer
+}
+
+// TDD RED: Tests for missing ListMarketsParams fields (min_close_ts, max_close_ts, event_ticker, tickers)
+func TestListMarkets_WithTimeFilters(t *testing.T) {
+	tests := []struct {
+		name         string
+		params       ListMarketsParams
+		wantQueryKey string
+		wantQueryVal string
+	}{
+		{
+			name: "filters by min_close_ts",
+			params: ListMarketsParams{
+				MinCloseTs: 1704067200,
+			},
+			wantQueryKey: "min_close_ts",
+			wantQueryVal: "1704067200",
+		},
+		{
+			name: "filters by max_close_ts",
+			params: ListMarketsParams{
+				MaxCloseTs: 1704153600,
+			},
+			wantQueryKey: "max_close_ts",
+			wantQueryVal: "1704153600",
+		},
+		{
+			name: "filters by event_ticker",
+			params: ListMarketsParams{
+				EventTicker: "PRES-2024",
+			},
+			wantQueryKey: "event_ticker",
+			wantQueryVal: "PRES-2024",
+		},
+		{
+			name: "filters by multiple tickers",
+			params: ListMarketsParams{
+				Tickers: []string{"BTC-100K", "ETH-10K"},
+			},
+			wantQueryKey: "tickers",
+			wantQueryVal: "BTC-100K,ETH-10K",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got := r.URL.Query().Get(tt.wantQueryKey)
+				if got != tt.wantQueryVal {
+					t.Errorf("expected %s=%s, got %s", tt.wantQueryKey, tt.wantQueryVal, got)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(models.MarketsResponse{
+					Markets: []models.Market{},
+					Cursor:  "",
+				})
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			_, err := client.ListMarkets(context.Background(), tt.params)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TDD RED: Test for orderbook depth parameter
+func TestGetOrderbook_WithDepth(t *testing.T) {
+	tests := []struct {
+		name      string
+		ticker    string
+		depth     int
+		wantDepth string
+	}{
+		{
+			name:      "requests orderbook with depth 5",
+			ticker:    "BTC-100K",
+			depth:     5,
+			wantDepth: "5",
+		},
+		{
+			name:      "requests orderbook with depth 10",
+			ticker:    "ETH-5K",
+			depth:     10,
+			wantDepth: "10",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got := r.URL.Query().Get("depth")
+				if got != tt.wantDepth {
+					t.Errorf("expected depth=%s, got %s", tt.wantDepth, got)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(models.OrderbookResponse{
+					Orderbook: models.Orderbook{
+						Ticker:  tt.ticker,
+						YesBids: []models.OrderbookLevel{},
+						YesAsks: []models.OrderbookLevel{},
+					},
+				})
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			_, err := client.GetOrderbookWithDepth(context.Background(), tt.ticker, tt.depth)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TDD RED: Test for trades with timestamp filters
+func TestGetTrades_WithTimeFilters(t *testing.T) {
+	tests := []struct {
+		name         string
+		params       GetTradesParams
+		wantQueryKey string
+		wantQueryVal string
+	}{
+		{
+			name: "filters by min_ts",
+			params: GetTradesParams{
+				Ticker: "BTC-100K",
+				MinTs:  1704067200,
+			},
+			wantQueryKey: "min_ts",
+			wantQueryVal: "1704067200",
+		},
+		{
+			name: "filters by max_ts",
+			params: GetTradesParams{
+				Ticker: "BTC-100K",
+				MaxTs:  1704153600,
+			},
+			wantQueryKey: "max_ts",
+			wantQueryVal: "1704153600",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got := r.URL.Query().Get(tt.wantQueryKey)
+				if got != tt.wantQueryVal {
+					t.Errorf("expected %s=%s, got %s", tt.wantQueryKey, tt.wantQueryVal, got)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				json.NewEncoder(w).Encode(models.TradesResponse{
+					Trades: []models.Trade{},
+					Cursor: "",
+				})
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			_, err := client.GetTrades(context.Background(), tt.params)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+// TDD RED: Test for batch candlesticks endpoint
+func TestGetBatchCandlesticks(t *testing.T) {
+	tests := []struct {
+		name           string
+		params         GetBatchCandlesticksParams
+		serverResponse models.BatchCandlesticksResponse
+		serverStatus   int
+		wantErr        bool
+		wantCount      int
+		skipServer     bool // for client-side validation tests
+	}{
+		{
+			name: "returns batch candlesticks for multiple tickers",
+			params: GetBatchCandlesticksParams{
+				Tickers: []string{"BTC-100K", "ETH-5K", "SOL-500"},
+				Period:  "1h",
+			},
+			serverResponse: models.BatchCandlesticksResponse{
+				MarketCandlesticks: []models.MarketCandlesticks{
+					{
+						Ticker: "BTC-100K",
+						Candlesticks: []models.Candlestick{
+							{Ticker: "BTC-100K", Open: 45, High: 48, Low: 44, Close: 47},
+						},
+					},
+					{
+						Ticker: "ETH-5K",
+						Candlesticks: []models.Candlestick{
+							{Ticker: "ETH-5K", Open: 30, High: 32, Low: 29, Close: 31},
+						},
+					},
+					{
+						Ticker: "SOL-500",
+						Candlesticks: []models.Candlestick{
+							{Ticker: "SOL-500", Open: 55, High: 58, Low: 54, Close: 57},
+						},
+					},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+			wantCount:    3,
+		},
+		{
+			name: "handles server error",
+			params: GetBatchCandlesticksParams{
+				Tickers: []string{"INVALID"},
+				Period:  "1h",
+			},
+			serverResponse: models.BatchCandlesticksResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET request, got %s", r.Method)
+				}
+
+				expectedPath := TradeAPIPrefix + "/markets/candlesticks/batch"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				// Verify tickers query param
+				tickersParam := r.URL.Query().Get("tickers")
+				if tt.params.Tickers != nil && len(tt.params.Tickers) > 0 && len(tt.params.Tickers) <= 100 {
+					expectedTickers := strings.Join(tt.params.Tickers, ",")
+					if tickersParam != expectedTickers {
+						t.Errorf("expected tickers=%s, got %s", expectedTickers, tickersParam)
+					}
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			resp, err := client.GetBatchCandlesticks(context.Background(), tt.params)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if len(resp.MarketCandlesticks) != tt.wantCount {
+				t.Errorf("expected %d market candlesticks, got %d", tt.wantCount, len(resp.MarketCandlesticks))
+			}
+		})
+	}
+}
+
+// TestGetBatchCandlesticks_MaxTickersLimit tests client-side validation of ticker limit
+func TestGetBatchCandlesticks_MaxTickersLimit(t *testing.T) {
+	// Generate 101 tickers to exceed limit
+	tickers := make([]string, 101)
+	for i := range tickers {
+		tickers[i] = "TICKER-" + strconv.Itoa(i)
+	}
+
+	client := newTestClient(t, "http://localhost:9999") // URL doesn't matter, will fail before request
+	_, err := client.GetBatchCandlesticks(context.Background(), GetBatchCandlesticksParams{
+		Tickers: tickers,
+		Period:  "1h",
+	})
+
+	if err == nil {
+		t.Error("expected error for exceeding max tickers, got nil")
+	}
+
+	if !strings.Contains(err.Error(), "exceeds maximum") {
+		t.Errorf("expected error message about exceeding maximum, got: %v", err)
+	}
+}
+
+// TDD RED: Test periodToInterval function covers all documented periods
+func TestPeriodToInterval(t *testing.T) {
+	tests := []struct {
+		period   string
+		expected string
+	}{
+		{"1m", "1"},
+		{"5m", "5"},
+		{"15m", "15"},
+		{"1h", "60"},
+		{"4h", "240"},
+		{"1d", "1440"},
+		{"unknown", "unknown"}, // passthrough for unknown periods
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.period, func(t *testing.T) {
+			result := periodToInterval(tt.period)
+			if result != tt.expected {
+				t.Errorf("periodToInterval(%q) = %q, want %q", tt.period, result, tt.expected)
+			}
+		})
+	}
 }

@@ -452,7 +452,7 @@ func runOrdersAmend(cmd *cobra.Command, args []string) error {
 	var response models.OrderResponse
 	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s", orderID)
 
-	if err := client.PutJSON(ctx, path, amendReq, &response); err != nil {
+	if err := client.PatchJSON(ctx, path, amendReq, &response); err != nil {
 		return fmt.Errorf("failed to amend order: %w", err)
 	}
 
@@ -574,7 +574,7 @@ func runOrdersQueue(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	var response models.QueuePositionsResponse
-	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s/queue", orderID)
+	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s/queue-position", orderID)
 
 	if err := client.GetJSON(ctx, path, &response); err != nil {
 		return fmt.Errorf("failed to get queue position: %w", err)

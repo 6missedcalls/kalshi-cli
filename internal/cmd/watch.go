@@ -163,7 +163,7 @@ func runWatchFills(_ *cobra.Command, _ []string) error {
 }
 
 func runWatchPositions(_ *cobra.Command, _ []string) error {
-	return runWatchMultiple([]websocket.Channel{websocket.ChannelUserOrders, websocket.ChannelUserFills}, nil)
+	return runWatch(websocket.ChannelMarketPositions, nil)
 }
 
 func runWatch(channel websocket.Channel, params map[string]string) error {
@@ -272,6 +272,8 @@ func registerHandlers(client *websocket.Client, channels []websocket.Channel) {
 		switch ch {
 		case websocket.ChannelMarketTicker:
 			client.RegisterHandler(ch, &tickerHandler{format: outputFormat})
+		case websocket.ChannelMarketTickerV2:
+			client.RegisterHandler(ch, &tickerV2Handler{format: outputFormat})
 		case websocket.ChannelOrderbook:
 			client.RegisterHandler(ch, &orderbookHandler{format: outputFormat})
 		case websocket.ChannelPublicTrades:
@@ -280,13 +282,21 @@ func registerHandlers(client *websocket.Client, channels []websocket.Channel) {
 			client.RegisterHandler(ch, &ordersHandler{format: outputFormat})
 		case websocket.ChannelUserFills:
 			client.RegisterHandler(ch, &fillsHandler{format: outputFormat})
+		case websocket.ChannelMarketPositions:
+			client.RegisterHandler(ch, &positionsHandler{format: outputFormat})
+		case websocket.ChannelMarketLifecycle:
+			client.RegisterHandler(ch, &lifecycleHandler{format: outputFormat})
+		case websocket.ChannelOrderGroupUpdates:
+			client.RegisterHandler(ch, &orderGroupHandler{format: outputFormat})
+		case websocket.ChannelCommunications:
+			client.RegisterHandler(ch, &communicationsHandler{format: outputFormat})
 		}
 	}
 }
 
 func requiresAuth(channels []websocket.Channel) bool {
 	for _, ch := range channels {
-		if ch == websocket.ChannelUserOrders || ch == websocket.ChannelUserFills {
+		if websocket.ChannelRequiresAuth(ch) {
 			return true
 		}
 	}
@@ -569,5 +579,156 @@ func printJSONLine(v interface{}) error {
 		return fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 	fmt.Println(string(data))
+	return nil
+}
+
+// tickerV2Handler handles market_ticker_v2 incremental delta messages
+type tickerV2Handler struct {
+	format ui.OutputFormat
+}
+
+func (h *tickerV2Handler) HandleMessage(msg websocket.Message) error {
+	var data websocket.TickerV2Data
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		return fmt.Errorf("failed to parse ticker v2 data: %w", err)
+	}
+
+	return h.output(data)
+}
+
+func (h *tickerV2Handler) output(data websocket.TickerV2Data) error {
+	switch h.format {
+	case ui.FormatJSON:
+		return printJSONLine(data)
+	case ui.FormatPlain:
+		fmt.Printf("%s %s delta_type=%s yes=%d no=%d delta=%d\n",
+			formatTimestamp(), data.Ticker, data.DeltaType, data.YesPrice, data.NoPrice, data.Delta)
+	default:
+		fmt.Printf("[%s] %s: %s (delta: %+d) Yes %s / No %s\n",
+			formatTimestamp(), data.Ticker, data.DeltaType, data.Delta,
+			formatCents(data.YesPrice), formatCents(data.NoPrice))
+	}
+	return nil
+}
+
+// positionsHandler handles market_positions messages
+type positionsHandler struct {
+	format ui.OutputFormat
+}
+
+func (h *positionsHandler) HandleMessage(msg websocket.Message) error {
+	var data websocket.PositionData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		return fmt.Errorf("failed to parse position data: %w", err)
+	}
+
+	return h.output(data)
+}
+
+func (h *positionsHandler) output(data websocket.PositionData) error {
+	switch h.format {
+	case ui.FormatJSON:
+		return printJSONLine(data)
+	case ui.FormatPlain:
+		fmt.Printf("%s ticker=%s position=%d cost=%d pnl=%d exposure=%d\n",
+			formatTimestamp(), data.Ticker, data.Position, data.TotalCost, data.RealizedPnl, data.Exposure)
+	default:
+		pnlStyle := ui.MutedStyle
+		if data.RealizedPnl > 0 {
+			pnlStyle = ui.PriceUpStyle
+		} else if data.RealizedPnl < 0 {
+			pnlStyle = ui.PriceDownStyle
+		}
+		fmt.Printf("[%s] %s: Position %d | Cost %s | PnL %s | Exposure %s\n",
+			formatTimestamp(), data.Ticker, data.Position,
+			formatCents(data.TotalCost), pnlStyle.Render(formatCents(data.RealizedPnl)),
+			formatCents(data.Exposure))
+	}
+	return nil
+}
+
+// lifecycleHandler handles market_lifecycle messages
+type lifecycleHandler struct {
+	format ui.OutputFormat
+}
+
+func (h *lifecycleHandler) HandleMessage(msg websocket.Message) error {
+	var data websocket.MarketLifecycleData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		return fmt.Errorf("failed to parse lifecycle data: %w", err)
+	}
+
+	return h.output(data)
+}
+
+func (h *lifecycleHandler) output(data websocket.MarketLifecycleData) error {
+	switch h.format {
+	case ui.FormatJSON:
+		return printJSONLine(data)
+	case ui.FormatPlain:
+		fmt.Printf("%s ticker=%s status=%s old_status=%s\n",
+			formatTimestamp(), data.Ticker, data.Status, data.OldStatus)
+	default:
+		fmt.Printf("[%s] %s: %s -> %s\n",
+			formatTimestamp(), data.Ticker, data.OldStatus, data.Status)
+	}
+	return nil
+}
+
+// orderGroupHandler handles order_group_updates messages
+type orderGroupHandler struct {
+	format ui.OutputFormat
+}
+
+func (h *orderGroupHandler) HandleMessage(msg websocket.Message) error {
+	var data websocket.OrderGroupUpdateData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		return fmt.Errorf("failed to parse order group data: %w", err)
+	}
+
+	return h.output(data)
+}
+
+func (h *orderGroupHandler) output(data websocket.OrderGroupUpdateData) error {
+	switch h.format {
+	case ui.FormatJSON:
+		return printJSONLine(data)
+	case ui.FormatPlain:
+		fmt.Printf("%s order_group=%s status=%s total=%d filled=%d\n",
+			formatTimestamp(), data.OrderGroupID, data.Status, data.TotalOrders, data.FilledOrders)
+	default:
+		fmt.Printf("[%s] Order Group %s: %s (%d/%d filled)\n",
+			formatTimestamp(), truncateID(data.OrderGroupID, 8), data.Status,
+			data.FilledOrders, data.TotalOrders)
+	}
+	return nil
+}
+
+// communicationsHandler handles communications (RFQ/quote) messages
+type communicationsHandler struct {
+	format ui.OutputFormat
+}
+
+func (h *communicationsHandler) HandleMessage(msg websocket.Message) error {
+	var data websocket.CommunicationData
+	if err := json.Unmarshal(msg.Data, &data); err != nil {
+		return fmt.Errorf("failed to parse communication data: %w", err)
+	}
+
+	return h.output(data)
+}
+
+func (h *communicationsHandler) output(data websocket.CommunicationData) error {
+	switch h.format {
+	case ui.FormatJSON:
+		return printJSONLine(data)
+	case ui.FormatPlain:
+		fmt.Printf("%s type=%s ticker=%s qty=%d price=%d side=%s\n",
+			formatTimestamp(), data.Type, data.Ticker, data.Quantity, data.Price, data.Side)
+	default:
+		fmt.Printf("[%s] %s: %s %s %d @ %s\n",
+			formatTimestamp(), strings.ToUpper(data.Type), data.Ticker,
+			strings.ToUpper(data.Side), data.Quantity, formatCents(data.Price))
+	}
 	return nil
 }

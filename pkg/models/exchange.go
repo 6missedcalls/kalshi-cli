@@ -47,7 +47,7 @@ type AnnouncementsResponse struct {
 	Announcements []Announcement `json:"announcements"`
 }
 
-// FeeChange represents a fee change
+// FeeChange represents a fee change (deprecated - use SeriesFeeChange)
 type FeeChange struct {
 	Ticker      string    `json:"ticker"`
 	OldFee      int       `json:"old_fee"`
@@ -55,7 +55,26 @@ type FeeChange struct {
 	EffectiveAt time.Time `json:"effective_at"`
 }
 
-// FeeChangesResponse is the API response for fee changes
+// FeeChangesResponse is the API response for fee changes (deprecated - use SeriesFeeChangesResponse)
 type FeeChangesResponse struct {
 	FeeChanges []FeeChange `json:"fee_changes"`
+}
+
+// SeriesFeeChange represents a fee change for a series per Kalshi API spec
+type SeriesFeeChange struct {
+	SeriesTicker  string    `json:"series_ticker"`
+	OldFeeRate    float64   `json:"old_fee_rate"`
+	NewFeeRate    float64   `json:"new_fee_rate"`
+	EffectiveDate time.Time `json:"effective_date"`
+	AnnouncedDate time.Time `json:"announced_date"`
+}
+
+// SeriesFeeChangesResponse is the API response for series fee changes
+type SeriesFeeChangesResponse struct {
+	SeriesFeeChanges []SeriesFeeChange `json:"series_fee_changes"`
+}
+
+// UserDataTimestampResponse is the API response for user data timestamp
+type UserDataTimestampResponse struct {
+	Timestamp time.Time `json:"timestamp"`
 }

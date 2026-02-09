@@ -78,7 +78,7 @@ func TestListAPIKeys(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := newTestClient(t, server.URL)
+			client := accountTestClient(t, server.URL)
 			keys, err := client.ListAPIKeys(context.Background())
 
 			if tt.wantErr {
@@ -178,7 +178,7 @@ func TestCreateAPIKey(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := newTestClient(t, server.URL)
+			client := accountTestClient(t, server.URL)
 			resp, err := client.CreateAPIKey(context.Background(), tt.request)
 
 			if tt.wantErr {
@@ -259,7 +259,7 @@ func TestDeleteAPIKey(t *testing.T) {
 			}))
 			defer server.Close()
 
-			client := newTestClient(t, server.URL)
+			client := accountTestClient(t, server.URL)
 			err := client.DeleteAPIKey(context.Background(), tt.keyID)
 
 			if tt.wantErr {
@@ -276,4 +276,293 @@ func TestDeleteAPIKey(t *testing.T) {
 	}
 }
 
-// TestGetAPILimits removed - APILimitsResponse and GetAPILimits not implemented
+func TestGetAPILimits(t *testing.T) {
+	tests := []struct {
+		name           string
+		serverResponse APILimitsResponse
+		serverStatus   int
+		wantErr        bool
+	}{
+		{
+			name: "returns API limits successfully",
+			serverResponse: APILimitsResponse{
+				RateLimit:        100,
+				MaxOrdersPerCall: 50,
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+		},
+		{
+			name:           "handles server error",
+			serverResponse: APILimitsResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+		{
+			name:           "handles unauthorized",
+			serverResponse: APILimitsResponse{},
+			serverStatus:   http.StatusUnauthorized,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET request, got %s", r.Method)
+				}
+
+				expectedPath := "/account/api-limits"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := accountTestClient(t, server.URL)
+			limits, err := client.GetAPILimits(context.Background())
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if limits.RateLimit != tt.serverResponse.RateLimit {
+				t.Errorf("expected rate limit %d, got %d", tt.serverResponse.RateLimit, limits.RateLimit)
+			}
+
+			if limits.MaxOrdersPerCall != tt.serverResponse.MaxOrdersPerCall {
+				t.Errorf("expected max orders per call %d, got %d", tt.serverResponse.MaxOrdersPerCall, limits.MaxOrdersPerCall)
+			}
+		})
+	}
+}
+
+func TestGenerateAPIKey(t *testing.T) {
+	now := time.Now().UTC()
+	tests := []struct {
+		name           string
+		request        GenerateAPIKeyRequest
+		serverResponse GenerateAPIKeyResponse
+		serverStatus   int
+		wantErr        bool
+	}{
+		{
+			name:    "generates API key pair successfully",
+			request: GenerateAPIKeyRequest{Name: "Generated Key"},
+			serverResponse: GenerateAPIKeyResponse{
+				APIKey: APIKey{
+					ID:          "generated-key-id",
+					Name:        "Generated Key",
+					CreatedTime: JSONTime{Time: now},
+					Scopes:      []string{"read", "trade"},
+				},
+				PrivateKey: "-----BEGIN RSA PRIVATE KEY-----\nMIIE...\n-----END RSA PRIVATE KEY-----",
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+		},
+		{
+			name:           "handles server error",
+			request:        GenerateAPIKeyRequest{Name: "Test Key"},
+			serverResponse: GenerateAPIKeyResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+		{
+			name:           "handles unauthorized",
+			request:        GenerateAPIKeyRequest{Name: "Test Key"},
+			serverResponse: GenerateAPIKeyResponse{},
+			serverStatus:   http.StatusUnauthorized,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Errorf("expected POST request, got %s", r.Method)
+				}
+
+				expectedPath := "/api-keys/generate"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				var req GenerateAPIKeyRequest
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					t.Errorf("failed to decode request body: %v", err)
+				}
+
+				if req.Name != tt.request.Name {
+					t.Errorf("expected name %q, got %q", tt.request.Name, req.Name)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := accountTestClient(t, server.URL)
+			resp, err := client.GenerateAPIKey(context.Background(), tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if resp.APIKey.Name != tt.request.Name {
+				t.Errorf("expected name %q, got %q", tt.request.Name, resp.APIKey.Name)
+			}
+
+			if resp.PrivateKey == "" {
+				t.Error("expected private key to be returned")
+			}
+		})
+	}
+}
+
+func TestCreateAPIKeyWithPublicKey(t *testing.T) {
+	now := time.Now().UTC()
+	testPublicKey := "-----BEGIN PUBLIC KEY-----\nMIIBIjANBg...\n-----END PUBLIC KEY-----"
+
+	tests := []struct {
+		name           string
+		request        CreateAPIKeyWithPublicKeyRequest
+		serverResponse CreateAPIKeyWithPublicKeyResponse
+		serverStatus   int
+		wantErr        bool
+	}{
+		{
+			name: "creates API key with public key successfully",
+			request: CreateAPIKeyWithPublicKeyRequest{
+				Name:      "My Key",
+				PublicKey: testPublicKey,
+			},
+			serverResponse: CreateAPIKeyWithPublicKeyResponse{
+				APIKey: APIKey{
+					ID:          "custom-key-id",
+					Name:        "My Key",
+					CreatedTime: JSONTime{Time: now},
+					Scopes:      []string{"read", "trade"},
+				},
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+		},
+		{
+			name: "handles missing public key error",
+			request: CreateAPIKeyWithPublicKeyRequest{
+				Name:      "My Key",
+				PublicKey: "",
+			},
+			serverResponse: CreateAPIKeyWithPublicKeyResponse{},
+			serverStatus:   http.StatusBadRequest,
+			wantErr:        true,
+		},
+		{
+			name: "handles server error",
+			request: CreateAPIKeyWithPublicKeyRequest{
+				Name:      "Test Key",
+				PublicKey: testPublicKey,
+			},
+			serverResponse: CreateAPIKeyWithPublicKeyResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+		{
+			name: "handles unauthorized",
+			request: CreateAPIKeyWithPublicKeyRequest{
+				Name:      "Test Key",
+				PublicKey: testPublicKey,
+			},
+			serverResponse: CreateAPIKeyWithPublicKeyResponse{},
+			serverStatus:   http.StatusUnauthorized,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodPost {
+					t.Errorf("expected POST request, got %s", r.Method)
+				}
+
+				expectedPath := "/api-keys"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				var req CreateAPIKeyWithPublicKeyRequest
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					t.Errorf("failed to decode request body: %v", err)
+				}
+
+				if req.Name != tt.request.Name {
+					t.Errorf("expected name %q, got %q", tt.request.Name, req.Name)
+				}
+
+				if req.PublicKey != tt.request.PublicKey {
+					t.Errorf("expected public key %q, got %q", tt.request.PublicKey, req.PublicKey)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := accountTestClient(t, server.URL)
+			resp, err := client.CreateAPIKeyWithPublicKey(context.Background(), tt.request)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if resp.APIKey.Name != tt.request.Name {
+				t.Errorf("expected name %q, got %q", tt.request.Name, resp.APIKey.Name)
+			}
+		})
+	}
+}
+
+// accountTestClient creates a test client with the given base URL for account tests
+func accountTestClient(t *testing.T, serverURL string) *Client {
+	t.Helper()
+	client := NewClient(nil, nil)
+	client.SetBaseURL(serverURL)
+	return client
+}

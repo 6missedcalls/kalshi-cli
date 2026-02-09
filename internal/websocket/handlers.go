@@ -9,12 +9,36 @@ import (
 type Channel string
 
 const (
-	ChannelMarketTicker Channel = "market_ticker"
-	ChannelOrderbook    Channel = "orderbook"
-	ChannelPublicTrades Channel = "public_trades"
-	ChannelUserOrders   Channel = "user_orders"
-	ChannelUserFills    Channel = "user_fills"
+	// Public channels (no auth required)
+	ChannelMarketTicker        Channel = "market_ticker"
+	ChannelMarketTickerV2      Channel = "market_ticker_v2"
+	ChannelPublicTrades        Channel = "public_trades"
+	ChannelMarketLifecycle     Channel = "market_lifecycle"
+	ChannelMultivariateLookups Channel = "multivariate_lookups"
+
+	// Authenticated channels
+	ChannelOrderbook         Channel = "orderbook"
+	ChannelUserOrders        Channel = "user_orders"
+	ChannelUserFills         Channel = "user_fills"
+	ChannelMarketPositions   Channel = "market_positions"
+	ChannelOrderGroupUpdates Channel = "order_group_updates"
+	ChannelCommunications    Channel = "communications"
 )
+
+// ChannelRequiresAuth returns true if the channel requires authentication
+func ChannelRequiresAuth(channel Channel) bool {
+	switch channel {
+	case ChannelOrderbook,
+		ChannelUserOrders,
+		ChannelUserFills,
+		ChannelMarketPositions,
+		ChannelOrderGroupUpdates,
+		ChannelCommunications:
+		return true
+	default:
+		return false
+	}
+}
 
 // Message represents a WebSocket message from the server
 type Message struct {

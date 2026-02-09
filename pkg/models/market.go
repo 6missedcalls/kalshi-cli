@@ -121,3 +121,14 @@ type SeriesResponse struct {
 	Series []Series `json:"series"`
 	Cursor string   `json:"cursor"`
 }
+
+// MarketCandlesticks represents candlestick data for a single market in batch response
+type MarketCandlesticks struct {
+	Ticker       string        `json:"ticker"`
+	Candlesticks []Candlestick `json:"candlesticks"`
+}
+
+// BatchCandlesticksResponse is the API response for batch candlesticks
+type BatchCandlesticksResponse struct {
+	MarketCandlesticks []MarketCandlesticks `json:"market_candlesticks"`
+}

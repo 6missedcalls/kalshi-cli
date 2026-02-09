@@ -178,8 +178,10 @@ func TestUpdateOrderGroupLimit(t *testing.T) {
 		if r.Method != http.MethodPatch {
 			t.Errorf("expected PATCH, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/portfolio/order_groups/group-123" {
-			t.Errorf("unexpected path: %s", r.URL.Path)
+		// Per Kalshi API spec: PATCH /order_groups/{group_id}/limit
+		expectedPath := "/trade-api/v2/portfolio/order_groups/group-123/limit"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path '%s', got '%s'", expectedPath, r.URL.Path)
 		}
 
 		var req models.UpdateOrderGroupLimitRequest
@@ -258,5 +260,232 @@ func TestOrderGroupsAPIError(t *testing.T) {
 	}
 	if apiErr.StatusCode != 404 {
 		t.Errorf("expected status 404, got %d", apiErr.StatusCode)
+	}
+}
+
+// TDD: Test for ResetOrderGroup - verifies POST to /order_groups/{id}/reset
+func TestResetOrderGroup(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/trade-api/v2/portfolio/order_groups/group-456/reset" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+
+		resp := models.OrderGroupResponse{
+			OrderGroup: models.OrderGroup{
+				GroupID:        "group-456",
+				Status:         "active",
+				Limit:          100,
+				FilledCount:    0, // Reset to 0
+				OrderCount:     5,
+				CreatedTime:    now,
+				LastUpdateTime: now,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := createTestClient(t, server.URL)
+	result, err := client.ResetOrderGroup(context.Background(), "group-456")
+	if err != nil {
+		t.Fatalf("ResetOrderGroup failed: %v", err)
+	}
+
+	if result.OrderGroup.GroupID != "group-456" {
+		t.Errorf("expected group ID 'group-456', got '%s'", result.OrderGroup.GroupID)
+	}
+	if result.OrderGroup.FilledCount != 0 {
+		t.Errorf("expected filled count 0 after reset, got %d", result.OrderGroup.FilledCount)
+	}
+}
+
+// TDD: Test for TriggerOrderGroup - verifies POST to /order_groups/{id}/trigger
+func TestTriggerOrderGroup(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+		if r.URL.Path != "/trade-api/v2/portfolio/order_groups/group-789/trigger" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+
+		resp := models.OrderGroupResponse{
+			OrderGroup: models.OrderGroup{
+				GroupID:        "group-789",
+				Status:         "triggered",
+				Limit:          50,
+				FilledCount:    50,
+				OrderCount:     0,
+				CreatedTime:    now,
+				LastUpdateTime: now,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := createTestClient(t, server.URL)
+	result, err := client.TriggerOrderGroup(context.Background(), "group-789")
+	if err != nil {
+		t.Fatalf("TriggerOrderGroup failed: %v", err)
+	}
+
+	if result.OrderGroup.GroupID != "group-789" {
+		t.Errorf("expected group ID 'group-789', got '%s'", result.OrderGroup.GroupID)
+	}
+	if result.OrderGroup.Status != "triggered" {
+		t.Errorf("expected status 'triggered', got '%s'", result.OrderGroup.Status)
+	}
+}
+
+// TDD: Test for UpdateOrderGroupLimit - verifies PATCH to /order_groups/{id}/limit
+// This test verifies the CORRECT endpoint path per Kalshi API spec
+func TestUpdateOrderGroupLimit_CorrectEndpoint(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
+		}
+		// Per Kalshi API spec, the endpoint should be /order_groups/{id}/limit
+		expectedPath := "/trade-api/v2/portfolio/order_groups/group-123/limit"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path '%s', got '%s'", expectedPath, r.URL.Path)
+		}
+
+		var req models.UpdateOrderGroupLimitRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
+		}
+
+		if req.Limit != 200 {
+			t.Errorf("expected limit 200, got %d", req.Limit)
+		}
+
+		resp := models.OrderGroupResponse{
+			OrderGroup: models.OrderGroup{
+				GroupID:        "group-123",
+				Limit:          req.Limit,
+				Status:         "active",
+				CreatedTime:    now,
+				LastUpdateTime: now,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := createTestClient(t, server.URL)
+	result, err := client.UpdateOrderGroupLimit(context.Background(), "group-123", 200)
+	if err != nil {
+		t.Fatalf("UpdateOrderGroupLimit failed: %v", err)
+	}
+
+	if result.OrderGroup.Limit != 200 {
+		t.Errorf("expected limit 200, got %d", result.OrderGroup.Limit)
+	}
+}
+
+// TDD: Test for empty group ID validation
+func TestGetOrderGroup_EmptyGroupID(t *testing.T) {
+	client := createTestClient(t, "http://localhost")
+	_, err := client.GetOrderGroup(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty group ID")
+	}
+	if err.Error() != "order group ID is required" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestUpdateOrderGroupLimit_EmptyGroupID(t *testing.T) {
+	client := createTestClient(t, "http://localhost")
+	_, err := client.UpdateOrderGroupLimit(context.Background(), "", 100)
+	if err == nil {
+		t.Fatal("expected error for empty group ID")
+	}
+	if err.Error() != "order group ID is required" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestDeleteOrderGroup_EmptyGroupID(t *testing.T) {
+	client := createTestClient(t, "http://localhost")
+	err := client.DeleteOrderGroup(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty group ID")
+	}
+	if err.Error() != "order group ID is required" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestResetOrderGroup_EmptyGroupID(t *testing.T) {
+	client := createTestClient(t, "http://localhost")
+	_, err := client.ResetOrderGroup(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty group ID")
+	}
+	if err.Error() != "order group ID is required" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+func TestTriggerOrderGroup_EmptyGroupID(t *testing.T) {
+	client := createTestClient(t, "http://localhost")
+	_, err := client.TriggerOrderGroup(context.Background(), "")
+	if err == nil {
+		t.Fatal("expected error for empty group ID")
+	}
+	if err.Error() != "order group ID is required" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
+// TDD: Test for CreateOrderGroup validation
+func TestCreateOrderGroup_ZeroLimit(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var req models.CreateOrderGroupRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
+		}
+
+		// API should accept zero limit (server-side validation)
+		resp := models.CreateOrderGroupResponse{
+			OrderGroup: models.OrderGroup{
+				GroupID:        "new-group",
+				Limit:          req.Limit,
+				Status:         "active",
+				CreatedTime:    now,
+				LastUpdateTime: now,
+			},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer server.Close()
+
+	client := createTestClient(t, server.URL)
+	result, err := client.CreateOrderGroup(context.Background(), models.CreateOrderGroupRequest{
+		Limit: 0,
+	})
+	if err != nil {
+		t.Fatalf("CreateOrderGroup failed: %v", err)
+	}
+
+	if result.OrderGroup.Limit != 0 {
+		t.Errorf("expected limit 0, got %d", result.OrderGroup.Limit)
 	}
 }

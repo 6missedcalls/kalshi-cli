@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	rfqsBasePath           = TradeAPIPrefix + "/rfqs"
-	quotesBasePath         = TradeAPIPrefix + "/quotes"
+	// Per Kalshi API docs, RFQs and Quotes are under /communications
+	rfqsBasePath           = TradeAPIPrefix + "/communications/rfqs"
+	quotesBasePath         = TradeAPIPrefix + "/communications/quotes"
 	communicationsBasePath = TradeAPIPrefix + "/communications"
 )
 
@@ -169,6 +170,21 @@ func (c *Client) CancelQuote(ctx context.Context, quoteID string) error {
 
 	path := quotesBasePath + "/" + quoteID
 	return c.DeleteJSON(ctx, path, nil)
+}
+
+// ConfirmQuote confirms a quote (quoter confirms their own quote after RFQ creator accepts)
+func (c *Client) ConfirmQuote(ctx context.Context, quoteID string) (*models.QuoteResponse, error) {
+	if quoteID == "" {
+		return nil, fmt.Errorf("quote ID is required")
+	}
+
+	path := quotesBasePath + "/" + quoteID + "/confirm"
+
+	var result models.QuoteResponse
+	if err := c.PostJSON(ctx, path, nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // GetCommunicationsID returns the user's communications ID for websocket subscriptions

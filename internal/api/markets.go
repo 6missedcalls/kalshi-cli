@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/6missedcalls/kalshi-cli/pkg/models"
 )
@@ -12,6 +13,10 @@ import (
 type ListMarketsParams struct {
 	Status       string
 	SeriesTicker string
+	EventTicker  string
+	Tickers      []string
+	MinCloseTs   int64
+	MaxCloseTs   int64
 	Limit        int
 	Cursor       string
 }
@@ -25,6 +30,18 @@ func (c *Client) ListMarkets(ctx context.Context, params ListMarketsParams) (*mo
 	}
 	if params.SeriesTicker != "" {
 		queryParams["series_ticker"] = params.SeriesTicker
+	}
+	if params.EventTicker != "" {
+		queryParams["event_ticker"] = params.EventTicker
+	}
+	if len(params.Tickers) > 0 {
+		queryParams["tickers"] = strings.Join(params.Tickers, ",")
+	}
+	if params.MinCloseTs > 0 {
+		queryParams["min_close_ts"] = strconv.FormatInt(params.MinCloseTs, 10)
+	}
+	if params.MaxCloseTs > 0 {
+		queryParams["max_close_ts"] = strconv.FormatInt(params.MaxCloseTs, 10)
 	}
 	if params.Limit > 0 {
 		queryParams["limit"] = strconv.Itoa(params.Limit)
@@ -67,11 +84,30 @@ func (c *Client) GetOrderbook(ctx context.Context, ticker string) (*models.Order
 	return &result.Orderbook, nil
 }
 
+// GetOrderbookWithDepth retrieves the orderbook for a market with a specific depth
+func (c *Client) GetOrderbookWithDepth(ctx context.Context, ticker string, depth int) (*models.Orderbook, error) {
+	queryParams := map[string]string{}
+	if depth > 0 {
+		queryParams["depth"] = strconv.Itoa(depth)
+	}
+
+	path := TradeAPIPrefix + "/markets/" + ticker + "/orderbook" + BuildQueryString(queryParams)
+
+	var result models.OrderbookResponse
+	if err := c.DoRequest(ctx, "GET", path, nil, &result); err != nil {
+		return nil, fmt.Errorf("failed to get orderbook: %w", err)
+	}
+
+	return &result.Orderbook, nil
+}
+
 // GetTradesParams contains parameters for getting trades
 type GetTradesParams struct {
 	Ticker string
 	Limit  int
 	Cursor string
+	MinTs  int64
+	MaxTs  int64
 }
 
 // GetTrades retrieves trades for a market
@@ -86,6 +122,12 @@ func (c *Client) GetTrades(ctx context.Context, params GetTradesParams) (*models
 	}
 	if params.Cursor != "" {
 		queryParams["cursor"] = params.Cursor
+	}
+	if params.MinTs > 0 {
+		queryParams["min_ts"] = strconv.FormatInt(params.MinTs, 10)
+	}
+	if params.MaxTs > 0 {
+		queryParams["max_ts"] = strconv.FormatInt(params.MaxTs, 10)
 	}
 
 	path := TradeAPIPrefix + "/markets/trades" + BuildQueryString(queryParams)
@@ -196,4 +238,46 @@ func (c *Client) GetSeries(ctx context.Context, ticker string) (*models.Series, 
 	}
 
 	return &result.Series, nil
+}
+
+// GetBatchCandlesticksParams contains parameters for getting batch candlesticks
+type GetBatchCandlesticksParams struct {
+	Tickers   []string
+	Period    string
+	StartTime int64
+	EndTime   int64
+}
+
+// MaxBatchCandlesticksTickers is the maximum number of tickers allowed in batch request
+const MaxBatchCandlesticksTickers = 100
+
+// GetBatchCandlesticks retrieves candlestick data for multiple markets (up to 100 tickers)
+func (c *Client) GetBatchCandlesticks(ctx context.Context, params GetBatchCandlesticksParams) (*models.BatchCandlesticksResponse, error) {
+	if len(params.Tickers) > MaxBatchCandlesticksTickers {
+		return nil, fmt.Errorf("batch candlesticks request exceeds maximum of %d tickers", MaxBatchCandlesticksTickers)
+	}
+
+	queryParams := map[string]string{}
+
+	if len(params.Tickers) > 0 {
+		queryParams["tickers"] = strings.Join(params.Tickers, ",")
+	}
+	if params.Period != "" {
+		queryParams["period_interval"] = periodToInterval(params.Period)
+	}
+	if params.StartTime > 0 {
+		queryParams["start_ts"] = strconv.FormatInt(params.StartTime, 10)
+	}
+	if params.EndTime > 0 {
+		queryParams["end_ts"] = strconv.FormatInt(params.EndTime, 10)
+	}
+
+	path := TradeAPIPrefix + "/markets/candlesticks/batch" + BuildQueryString(queryParams)
+
+	var result models.BatchCandlesticksResponse
+	if err := c.DoRequest(ctx, "GET", path, nil, &result); err != nil {
+		return nil, fmt.Errorf("failed to get batch candlesticks: %w", err)
+	}
+
+	return &result, nil
 }

@@ -68,12 +68,13 @@ func (c *Client) CreateOrderGroup(ctx context.Context, req models.CreateOrderGro
 }
 
 // UpdateOrderGroupLimit updates the fill limit for an order group
+// Per Kalshi API spec: PATCH /order-groups/{group_id}/limit
 func (c *Client) UpdateOrderGroupLimit(ctx context.Context, groupID string, newLimit int) (*models.OrderGroupResponse, error) {
 	if groupID == "" {
 		return nil, fmt.Errorf("order group ID is required")
 	}
 
-	path := orderGroupsBasePath + "/" + groupID
+	path := orderGroupsBasePath + "/" + groupID + "/limit"
 	req := models.UpdateOrderGroupLimitRequest{Limit: newLimit}
 
 	var result models.OrderGroupResponse

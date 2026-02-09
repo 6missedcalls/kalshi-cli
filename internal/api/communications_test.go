@@ -29,7 +29,7 @@ func TestGetRFQs(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/rfqs" {
+		if r.URL.Path != "/trade-api/v2/communications/rfqs" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -99,7 +99,7 @@ func TestGetRFQ(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/rfqs/rfq-123" {
+		if r.URL.Path != "/trade-api/v2/communications/rfqs/rfq-123" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -127,7 +127,7 @@ func TestCreateRFQ(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/rfqs" {
+		if r.URL.Path != "/trade-api/v2/communications/rfqs" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -182,7 +182,7 @@ func TestCancelRFQ(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/rfqs/rfq-to-cancel" {
+		if r.URL.Path != "/trade-api/v2/communications/rfqs/rfq-to-cancel" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -217,7 +217,7 @@ func TestGetQuotes(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/quotes" {
+		if r.URL.Path != "/trade-api/v2/communications/quotes" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -288,7 +288,7 @@ func TestGetQuote(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/quotes/quote-123" {
+		if r.URL.Path != "/trade-api/v2/communications/quotes/quote-123" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -316,7 +316,7 @@ func TestCreateQuote(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/quotes" {
+		if r.URL.Path != "/trade-api/v2/communications/quotes" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -370,7 +370,7 @@ func TestAcceptQuote(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/quotes/quote-123/accept" {
+		if r.URL.Path != "/trade-api/v2/communications/quotes/quote-123/accept" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -402,7 +402,7 @@ func TestCancelQuote(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/quotes/quote-to-cancel" {
+		if r.URL.Path != "/trade-api/v2/communications/quotes/quote-to-cancel" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 

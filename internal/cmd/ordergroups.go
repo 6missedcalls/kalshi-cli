@@ -70,9 +70,20 @@ var orderGroupsTriggerCmd = &cobra.Command{
 	RunE:  runOrderGroupsTrigger,
 }
 
+var orderGroupsUpdateLimitCmd = &cobra.Command{
+	Use:   "update-limit <group-id>",
+	Short: "Update an order group's contract limit",
+	Long: `Update the maximum number of contracts that can be filled across all orders
+in the group. If the new limit is lower than the current filled count,
+the order group will be triggered.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runOrderGroupsUpdateLimit,
+}
+
 var (
-	orderGroupLimit  int
-	orderGroupStatus string
+	orderGroupLimit    int
+	orderGroupNewLimit int
+	orderGroupStatus   string
 )
 
 func init() {
@@ -84,11 +95,15 @@ func init() {
 	orderGroupsCmd.AddCommand(orderGroupsDeleteCmd)
 	orderGroupsCmd.AddCommand(orderGroupsResetCmd)
 	orderGroupsCmd.AddCommand(orderGroupsTriggerCmd)
+	orderGroupsCmd.AddCommand(orderGroupsUpdateLimitCmd)
 
 	orderGroupsListCmd.Flags().StringVar(&orderGroupStatus, "status", "", "filter by status")
 
 	orderGroupsCreateCmd.Flags().IntVar(&orderGroupLimit, "limit", 0, "maximum contracts to fill (required)")
 	orderGroupsCreateCmd.MarkFlagRequired("limit")
+
+	orderGroupsUpdateLimitCmd.Flags().IntVar(&orderGroupNewLimit, "limit", 0, "new maximum contracts to fill (required)")
+	orderGroupsUpdateLimitCmd.MarkFlagRequired("limit")
 }
 
 // getAPIClient uses createClient from helpers.go
@@ -204,6 +219,27 @@ func runOrderGroupsTrigger(cmd *cobra.Command, args []string) error {
 	}
 
 	PrintSuccess(fmt.Sprintf("Triggered order group: %s", groupID))
+	return outputOrderGroupDetails(&result.OrderGroup)
+}
+
+func runOrderGroupsUpdateLimit(cmd *cobra.Command, args []string) error {
+	groupID := args[0]
+
+	if orderGroupNewLimit < 0 {
+		return fmt.Errorf("limit must be a non-negative integer")
+	}
+
+	client, err := createClient()
+	if err != nil {
+		return err
+	}
+
+	result, err := client.UpdateOrderGroupLimit(context.Background(), groupID, orderGroupNewLimit)
+	if err != nil {
+		return err
+	}
+
+	PrintSuccess(fmt.Sprintf("Updated order group limit: %s (new limit: %d)", groupID, orderGroupNewLimit))
 	return outputOrderGroupDetails(&result.OrderGroup)
 }
 

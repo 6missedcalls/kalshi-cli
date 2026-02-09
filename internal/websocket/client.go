@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	defaultPingInterval       = 30 * time.Second
+	// Kalshi spec: "Ping frames every 10 seconds, respond with Pong"
+	defaultPingInterval       = 10 * time.Second
 	defaultReconnectBaseDelay = 1 * time.Second
 	defaultReconnectMaxDelay  = 60 * time.Second
 	defaultWriteTimeout       = 10 * time.Second
@@ -518,4 +519,44 @@ type PositionData struct {
 	TotalCost   int    `json:"total_cost"`
 	RealizedPnl int    `json:"realized_pnl"`
 	Exposure    int    `json:"exposure"`
+}
+
+// TickerV2Data represents incremental delta ticker updates (market_ticker_v2)
+type TickerV2Data struct {
+	Ticker    string `json:"ticker"`
+	DeltaType string `json:"delta_type"`
+	YesPrice  int    `json:"yes_price"`
+	NoPrice   int    `json:"no_price"`
+	Delta     int    `json:"delta"`
+	Volume    int    `json:"volume"`
+}
+
+// OrderGroupUpdateData represents order group lifecycle updates
+type OrderGroupUpdateData struct {
+	OrderGroupID string `json:"order_group_id"`
+	Status       string `json:"status"`
+	TotalOrders  int    `json:"total_orders"`
+	FilledOrders int    `json:"filled_orders"`
+}
+
+// MarketLifecycleData represents market state changes
+type MarketLifecycleData struct {
+	Ticker    string `json:"ticker"`
+	Status    string `json:"status"`
+	OldStatus string `json:"old_status"`
+}
+
+// CommunicationData represents RFQ/quote notifications
+type CommunicationData struct {
+	Type     string `json:"type"`
+	Ticker   string `json:"ticker"`
+	Quantity int    `json:"quantity"`
+	Price    int    `json:"price"`
+	Side     string `json:"side"`
+}
+
+// MultivariateLookupData represents collection lookup notifications
+type MultivariateLookupData struct {
+	SeriesID    string `json:"series_id"`
+	LookupValue string `json:"lookup_value"`
 }

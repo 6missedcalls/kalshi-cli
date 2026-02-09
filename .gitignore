@@ -1,0 +1,66 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+kalshi-cli
+
+# Build output
+dist/
+build/
+bin/
+
+# Go workspace
+vendor/
+
+# Test artifacts
+coverage.out
+*.cover
+*.prof
+*.test
+cpu.pprof
+mem.pprof
+
+# Environment and secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Debug
+debug
+__debug_bin*
+
+# GoReleaser
+dist/
+
+# Temporary files
+*.tmp
+*.bak
+*.log

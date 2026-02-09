@@ -95,39 +95,52 @@ func (c *Client) CancelOrder(ctx context.Context, orderID string) (*models.Order
 }
 
 // AmendOrder amends an existing order's price or count
+// API spec: PATCH /orders/{order_id}
 func (c *Client) AmendOrder(ctx context.Context, orderID string, req models.AmendOrderRequest) (*models.OrderResponse, error) {
 	if orderID == "" {
 		return nil, fmt.Errorf("order ID is required")
+	}
+	if req.Price == 0 && req.Count == 0 {
+		return nil, fmt.Errorf("at least one of price or count must be specified")
 	}
 
 	path := ordersBasePath + "/" + orderID
 
 	var result models.OrderResponse
-	if err := c.PostJSON(ctx, path, req, &result); err != nil {
+	if err := c.PatchJSON(ctx, path, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
 // DecreaseOrder decreases an order's quantity
+// API spec: PATCH /orders/{order_id}/decrease
 func (c *Client) DecreaseOrder(ctx context.Context, orderID string, reduceBy int) (*models.OrderResponse, error) {
 	if orderID == "" {
 		return nil, fmt.Errorf("order ID is required")
+	}
+	if reduceBy <= 0 {
+		return nil, fmt.Errorf("reduce_by must be a positive integer, got %d", reduceBy)
 	}
 
 	path := ordersBasePath + "/" + orderID + "/decrease"
 	req := models.DecreaseOrderRequest{ReduceBy: reduceBy}
 
 	var result models.OrderResponse
-	if err := c.PostJSON(ctx, path, req, &result); err != nil {
+	if err := c.PatchJSON(ctx, path, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
 // BatchCreateOrders creates multiple orders in a single request
+// API spec: POST /orders/batch (max 20 orders per batch)
 func (c *Client) BatchCreateOrders(ctx context.Context, orders []models.CreateOrderRequest) (*models.BatchCreateOrdersResponse, error) {
-	path := ordersBasePath + "/batched"
+	if len(orders) > 20 {
+		return nil, fmt.Errorf("batch create supports max 20 orders, got %d", len(orders))
+	}
+
+	path := ordersBasePath + "/batch"
 	req := models.BatchCreateOrdersRequest{Orders: orders}
 
 	var result models.BatchCreateOrdersResponse
@@ -138,21 +151,29 @@ func (c *Client) BatchCreateOrders(ctx context.Context, orders []models.CreateOr
 }
 
 // BatchCancelOrders cancels multiple orders in a single request
+// API spec: DELETE /orders/batch (max 20 orders per batch)
 func (c *Client) BatchCancelOrders(ctx context.Context, req models.BatchCancelOrdersRequest) (*models.BatchCancelOrdersResponse, error) {
+	if len(req.OrderIDs) > 20 {
+		return nil, fmt.Errorf("batch cancel supports max 20 orders, got %d", len(req.OrderIDs))
+	}
+
+	path := ordersBasePath + "/batch"
+
 	var result models.BatchCancelOrdersResponse
-	if err := c.DeleteWithBody(ctx, ordersBasePath, req, &result); err != nil {
+	if err := c.DeleteWithBody(ctx, path, req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
 }
 
 // GetQueuePosition returns the queue position for a specific order
+// API spec: GET /orders/{order_id}/queue-position
 func (c *Client) GetQueuePosition(ctx context.Context, orderID string) (*models.QueuePosition, error) {
 	if orderID == "" {
 		return nil, fmt.Errorf("order ID is required")
 	}
 
-	path := ordersBasePath + "/" + orderID + "/position"
+	path := ordersBasePath + "/" + orderID + "/queue-position"
 
 	var result models.QueuePosition
 	if err := c.GetJSON(ctx, path, &result); err != nil {
@@ -162,8 +183,9 @@ func (c *Client) GetQueuePosition(ctx context.Context, orderID string) (*models.
 }
 
 // GetAllQueuePositions returns queue positions for all resting orders
+// API spec: GET /orders/queue-positions
 func (c *Client) GetAllQueuePositions(ctx context.Context) (*models.QueuePositionsResponse, error) {
-	path := ordersBasePath + "/positions"
+	path := ordersBasePath + "/queue-positions"
 
 	var result models.QueuePositionsResponse
 	if err := c.GetJSON(ctx, path, &result); err != nil {

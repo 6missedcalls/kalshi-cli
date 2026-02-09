@@ -41,7 +41,12 @@ type Balance struct {
 
 // BalanceResponse is the API response for balance
 type BalanceResponse struct {
-	Balance int `json:"balance"`
+	Balance                 int `json:"balance"`
+	AvailableBalance        int `json:"available_balance"`
+	PortfolioValue          int `json:"portfolio_value"`
+	BonusCashBalance        int `json:"bonus_cash_balance"`
+	TotalRestingOrdersValue int `json:"total_resting_orders_value"`
+	PayoutBalance           int `json:"payout_balance"`
 }
 
 // Fill represents a trade fill
@@ -114,4 +119,21 @@ type TransferRequest struct {
 	FromSubaccount int `json:"from_subaccount_id"`
 	ToSubaccount   int `json:"to_subaccount_id"`
 	Amount         int `json:"amount"`
+}
+
+// SubaccountBalance represents a subaccount balance entry
+type SubaccountBalance struct {
+	SubaccountID     int `json:"subaccount_id"`
+	Balance          int `json:"balance"`
+	AvailableBalance int `json:"available_balance"`
+}
+
+// SubaccountBalancesResponse is the API response for subaccount balances
+type SubaccountBalancesResponse struct {
+	Balances []SubaccountBalance `json:"balances"`
+}
+
+// RestingOrderValueResponse is the API response for resting order value
+type RestingOrderValueResponse struct {
+	RestingOrderValue int `json:"resting_order_value"`
 }

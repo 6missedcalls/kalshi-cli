@@ -287,24 +287,25 @@ func TestGetAnnouncements(t *testing.T) {
 	}
 }
 
-func TestGetFeeChanges(t *testing.T) {
+func TestGetSeriesFeeChanges(t *testing.T) {
 	now := time.Now().UTC()
 	tests := []struct {
 		name           string
-		serverResponse models.FeeChangesResponse
+		serverResponse models.SeriesFeeChangesResponse
 		serverStatus   int
 		wantErr        bool
 		wantCount      int
 	}{
 		{
-			name: "returns fee changes successfully",
-			serverResponse: models.FeeChangesResponse{
-				FeeChanges: []models.FeeChange{
+			name: "returns series fee changes successfully",
+			serverResponse: models.SeriesFeeChangesResponse{
+				SeriesFeeChanges: []models.SeriesFeeChange{
 					{
-						Ticker:      "BTC-100K",
-						OldFee:      5,
-						NewFee:      3,
-						EffectiveAt: now.Add(24 * time.Hour),
+						SeriesTicker:   "PRES",
+						OldFeeRate:     0.05,
+						NewFeeRate:     0.03,
+						EffectiveDate:  now.Add(24 * time.Hour),
+						AnnouncedDate:  now,
 					},
 				},
 			},
@@ -313,9 +314,9 @@ func TestGetFeeChanges(t *testing.T) {
 			wantCount:    1,
 		},
 		{
-			name: "returns empty fee changes",
-			serverResponse: models.FeeChangesResponse{
-				FeeChanges: []models.FeeChange{},
+			name: "returns empty series fee changes",
+			serverResponse: models.SeriesFeeChangesResponse{
+				SeriesFeeChanges: []models.SeriesFeeChange{},
 			},
 			serverStatus: http.StatusOK,
 			wantErr:      false,
@@ -323,7 +324,7 @@ func TestGetFeeChanges(t *testing.T) {
 		},
 		{
 			name:           "handles server error",
-			serverResponse: models.FeeChangesResponse{},
+			serverResponse: models.SeriesFeeChangesResponse{},
 			serverStatus:   http.StatusInternalServerError,
 			wantErr:        true,
 		},
@@ -336,7 +337,8 @@ func TestGetFeeChanges(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
-				expectedPath := TradeAPIPrefix + "/exchange/fee-changes"
+				// Correct API path per Kalshi documentation
+				expectedPath := TradeAPIPrefix + "/exchange/series-fee-changes"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -350,7 +352,7 @@ func TestGetFeeChanges(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server.URL)
-			resp, err := client.GetFeeChanges(context.Background())
+			resp, err := client.GetSeriesFeeChanges(context.Background())
 
 			if tt.wantErr {
 				if err == nil {
@@ -363,9 +365,104 @@ func TestGetFeeChanges(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if len(resp.FeeChanges) != tt.wantCount {
-				t.Errorf("expected %d fee changes, got %d", tt.wantCount, len(resp.FeeChanges))
+			if len(resp.SeriesFeeChanges) != tt.wantCount {
+				t.Errorf("expected %d series fee changes, got %d", tt.wantCount, len(resp.SeriesFeeChanges))
 			}
 		})
+	}
+}
+
+func TestGetUserDataTimestamp(t *testing.T) {
+	now := time.Now().UTC()
+	tests := []struct {
+		name           string
+		serverResponse models.UserDataTimestampResponse
+		serverStatus   int
+		wantErr        bool
+	}{
+		{
+			name: "returns user data timestamp successfully",
+			serverResponse: models.UserDataTimestampResponse{
+				Timestamp: now,
+			},
+			serverStatus: http.StatusOK,
+			wantErr:      false,
+		},
+		{
+			name:           "handles server error",
+			serverResponse: models.UserDataTimestampResponse{},
+			serverStatus:   http.StatusInternalServerError,
+			wantErr:        true,
+		},
+		{
+			name:           "handles unauthorized error",
+			serverResponse: models.UserDataTimestampResponse{},
+			serverStatus:   http.StatusUnauthorized,
+			wantErr:        true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Errorf("expected GET request, got %s", r.Method)
+				}
+
+				expectedPath := TradeAPIPrefix + "/exchange/user-data-timestamp"
+				if r.URL.Path != expectedPath {
+					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+				}
+
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tt.serverStatus)
+				if tt.serverStatus == http.StatusOK {
+					json.NewEncoder(w).Encode(tt.serverResponse)
+				}
+			}))
+			defer server.Close()
+
+			client := newTestClient(t, server.URL)
+			resp, err := client.GetUserDataTimestamp(context.Background())
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if resp.Timestamp.IsZero() {
+				t.Error("expected non-zero timestamp")
+			}
+		})
+	}
+}
+
+func TestGetExchangeStatusUsesCorrectPath(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verify the correct path with TradeAPIPrefix
+		expectedPath := TradeAPIPrefix + "/exchange/status"
+		if r.URL.Path != expectedPath {
+			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(ExchangeStatusResponse{
+			ExchangeActive: true,
+			TradingActive:  true,
+		})
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL)
+	_, err := client.GetExchangeStatus(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }

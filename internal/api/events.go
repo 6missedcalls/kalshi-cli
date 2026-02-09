@@ -30,6 +30,13 @@ type ListMultivariateParams struct {
 	Cursor string
 }
 
+// ForecastPercentileHistoryParams contains parameters for getting forecast history
+type ForecastPercentileHistoryParams struct {
+	Ticker    string
+	StartTime *time.Time
+	EndTime   *time.Time
+}
+
 // ListEvents retrieves a list of events with optional filtering
 func (c *Client) ListEvents(ctx context.Context, params ListEventsParams) ([]models.Event, string, error) {
 	queryParams := make(map[string]string)
@@ -129,4 +136,37 @@ func (c *Client) GetMultivariateEvent(ctx context.Context, ticker string) (*mode
 	}
 
 	return &resp.Event, nil
+}
+
+// GetEventMetadata retrieves metadata for a specific event
+func (c *Client) GetEventMetadata(ctx context.Context, ticker string) (*models.EventMetadata, error) {
+	path := TradeAPIPrefix + "/events/" + ticker + "/metadata"
+
+	var resp models.EventMetadataResponse
+	if err := c.DoRequest(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, err
+	}
+
+	return &resp.EventMetadata, nil
+}
+
+// GetForecastPercentileHistory retrieves historical forecast percentile data for an event
+func (c *Client) GetForecastPercentileHistory(ctx context.Context, params ForecastPercentileHistoryParams) ([]models.ForecastPercentilePoint, error) {
+	queryParams := make(map[string]string)
+
+	if params.StartTime != nil {
+		queryParams["start_ts"] = strconv.FormatInt(params.StartTime.Unix(), 10)
+	}
+	if params.EndTime != nil {
+		queryParams["end_ts"] = strconv.FormatInt(params.EndTime.Unix(), 10)
+	}
+
+	path := TradeAPIPrefix + "/events/" + params.Ticker + "/forecast-percentile-history" + BuildQueryString(queryParams)
+
+	var resp models.ForecastPercentileHistoryResponse
+	if err := c.DoRequest(ctx, "GET", path, nil, &resp); err != nil {
+		return nil, err
+	}
+
+	return resp.History, nil
 }

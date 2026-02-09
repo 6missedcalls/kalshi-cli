@@ -211,8 +211,8 @@ func TestCancelOrder(t *testing.T) {
 
 func TestAmendOrder(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
 		}
 		if r.URL.Path != "/trade-api/v2/portfolio/orders/order-to-amend" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -253,8 +253,8 @@ func TestAmendOrder(t *testing.T) {
 
 func TestDecreaseOrder(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodPatch {
+			t.Errorf("expected PATCH, got %s", r.Method)
 		}
 		if r.URL.Path != "/trade-api/v2/portfolio/orders/order-to-decrease/decrease" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
@@ -296,7 +296,7 @@ func TestBatchCreateOrders(t *testing.T) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/portfolio/orders/batched" {
+		if r.URL.Path != "/trade-api/v2/portfolio/orders/batch" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -339,7 +339,7 @@ func TestBatchCancelOrders(t *testing.T) {
 		if r.Method != http.MethodDelete {
 			t.Errorf("expected DELETE, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/portfolio/orders" {
+		if r.URL.Path != "/trade-api/v2/portfolio/orders/batch" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -377,7 +377,7 @@ func TestGetQueuePosition(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/portfolio/orders/order-123/position" {
+		if r.URL.Path != "/trade-api/v2/portfolio/orders/order-123/queue-position" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 
@@ -406,7 +406,7 @@ func TestGetAllQueuePositions(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/trade-api/v2/portfolio/orders/positions" {
+		if r.URL.Path != "/trade-api/v2/portfolio/orders/queue-positions" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 

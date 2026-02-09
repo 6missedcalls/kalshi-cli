@@ -249,6 +249,11 @@ func (c *Client) PutJSON(ctx context.Context, path string, body interface{}, res
 	return c.DoRequest(ctx, http.MethodPut, path, body, result)
 }
 
+// PatchJSON performs a PATCH request and unmarshals response into result
+func (c *Client) PatchJSON(ctx context.Context, path string, body interface{}, result interface{}) error {
+	return c.DoRequest(ctx, http.MethodPatch, path, body, result)
+}
+
 // DeleteJSON performs a DELETE request and unmarshals response into result
 func (c *Client) DeleteJSON(ctx context.Context, path string, result interface{}) error {
 	return c.DoRequest(ctx, http.MethodDelete, path, nil, result)
@@ -370,7 +375,8 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 // GetExchangeStatus returns the current exchange status
 func (c *Client) GetExchangeStatus(ctx context.Context) (*ExchangeStatusResponse, error) {
 	var result ExchangeStatusResponse
-	if err := c.DoRequest(ctx, "GET", "/exchange/status", nil, &result); err != nil {
+	path := TradeAPIPrefix + "/exchange/status"
+	if err := c.DoRequest(ctx, "GET", path, nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -427,6 +433,61 @@ func (c *Client) CreateAPIKey(ctx context.Context, req CreateAPIKeyRequest) (*Cr
 // DeleteAPIKey deletes an API key by ID
 func (c *Client) DeleteAPIKey(ctx context.Context, keyID string) error {
 	return c.DoRequest(ctx, "DELETE", "/api-keys/"+keyID, nil, nil)
+}
+
+// APILimitsResponse represents the API rate limits for the account
+type APILimitsResponse struct {
+	RateLimit        int `json:"rate_limit"`
+	MaxOrdersPerCall int `json:"max_orders_per_call"`
+}
+
+// GetAPILimits retrieves the API tier limits for the authenticated user
+func (c *Client) GetAPILimits(ctx context.Context) (*APILimitsResponse, error) {
+	var result APILimitsResponse
+	if err := c.DoRequest(ctx, "GET", "/account/api-limits", nil, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// GenerateAPIKeyRequest is the request to generate a new API key pair
+type GenerateAPIKeyRequest struct {
+	Name string `json:"name,omitempty"`
+}
+
+// GenerateAPIKeyResponse is the response from generating an API key pair
+type GenerateAPIKeyResponse struct {
+	APIKey     APIKey `json:"api_key"`
+	PrivateKey string `json:"private_key"`
+}
+
+// GenerateAPIKey generates a new API key pair (Kalshi generates the key pair)
+func (c *Client) GenerateAPIKey(ctx context.Context, req GenerateAPIKeyRequest) (*GenerateAPIKeyResponse, error) {
+	var result GenerateAPIKeyResponse
+	if err := c.DoRequest(ctx, "POST", "/api-keys/generate", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+// CreateAPIKeyWithPublicKeyRequest is the request to create an API key with a user-provided public key
+type CreateAPIKeyWithPublicKeyRequest struct {
+	Name      string `json:"name,omitempty"`
+	PublicKey string `json:"public_key"`
+}
+
+// CreateAPIKeyWithPublicKeyResponse is the response from creating an API key with a user-provided public key
+type CreateAPIKeyWithPublicKeyResponse struct {
+	APIKey APIKey `json:"api_key"`
+}
+
+// CreateAPIKeyWithPublicKey creates a new API key using a user-provided RSA public key
+func (c *Client) CreateAPIKeyWithPublicKey(ctx context.Context, req CreateAPIKeyWithPublicKeyRequest) (*CreateAPIKeyWithPublicKeyResponse, error) {
+	var result CreateAPIKeyWithPublicKeyResponse
+	if err := c.DoRequest(ctx, "POST", "/api-keys", req, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 
 // JSONTime is a time.Time that can be unmarshaled from JSON

@@ -1,16 +1,16 @@
 # kalshi-cli
 
-A comprehensive command-line interface for the [Kalshi](https://kalshi.com) prediction market exchange. Built for automated trading systems and bots.
+A comprehensive command-line interface for the [Kalshi](https://kalshi.com) prediction market exchange. Trade event contracts, monitor positions, and stream real-time market data from your terminal.
 
-**Designed for OpenClaw.ai bots** - All commands support `--json` output for machine parsing and `--yes` to skip confirmations.
+Built for traders, developers, and automated trading systems. All commands support `--json` output for machine parsing and `--yes` to skip confirmations.
 
 ## Table of Contents
 
+- [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Global Flags](#global-flags)
 - [Authentication](#authentication)
-- [Bot-Friendly Features](#bot-friendly-features)
+- [Global Flags](#global-flags)
 - [Command Reference](#command-reference)
   - [Markets](#markets)
   - [Events](#events)
@@ -21,88 +21,136 @@ A comprehensive command-line interface for the [Kalshi](https://kalshi.com) pred
   - [Exchange](#exchange)
   - [Watch (WebSocket)](#watch-websocket)
   - [Config](#config)
-- [Common Bot Workflows](#common-bot-workflows)
+- [Bot Integration](#bot-integration)
 - [JSON Output Schemas](#json-output-schemas)
 - [Error Handling](#error-handling)
-- [Exit Codes](#exit-codes)
+- [Configuration](#configuration)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- **Full Kalshi API coverage** - Markets, events, orders, portfolio, RFQs, order groups, and exchange info
+- **Real-time WebSocket streaming** - Live price tickers, orderbook updates, trades, fills, and position changes
+- **Secure authentication** - RSA-SHA256 signatures with credentials stored in your OS keyring (Keychain, Secret Service, Credential Manager)
+- **Bot-friendly** - JSON output, no-confirmation mode, structured exit codes, idempotent operations
+- **Demo-first** - Defaults to Kalshi's demo environment so you never accidentally trade real money
+- **Cross-platform** - macOS (Intel + Apple Silicon), Linux, and Windows
+- **Batch operations** - Create multiple orders from a JSON file in one call
+- **Order groups** - Cap total fills across multiple orders
+- **Block trading** - RFQ (Request for Quotes) workflow for large positions
 
 ## Installation
 
-### Go Install
-```bash
-go install github.com/6missedcalls/kalshi-cli/cmd/kalshi-cli@latest
-```
+### Homebrew (macOS / Linux)
 
-### Homebrew (macOS/Linux)
 ```bash
 brew install 6missedcalls/tap/kalshi-cli
 ```
 
+### Go Install
+
+Requires Go 1.21+:
+
+```bash
+go install github.com/6missedcalls/kalshi-cli/cmd/kalshi-cli@latest
+```
+
 ### Binary Download
+
+Download the latest release for your platform:
+
 ```bash
 # macOS (Apple Silicon)
 curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_darwin_arm64.tar.gz
-tar -xzf kalshi-cli_darwin_arm64.tar.gz && sudo mv kalshi-cli /usr/local/bin/
+tar -xzf kalshi-cli_darwin_arm64.tar.gz
+sudo mv kalshi-cli /usr/local/bin/
+
+# macOS (Intel)
+curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_darwin_amd64.tar.gz
+tar -xzf kalshi-cli_darwin_amd64.tar.gz
+sudo mv kalshi-cli /usr/local/bin/
 
 # Linux (x86_64)
 curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_linux_amd64.tar.gz
-tar -xzf kalshi-cli_linux_amd64.tar.gz && sudo mv kalshi-cli /usr/local/bin/
+tar -xzf kalshi-cli_linux_amd64.tar.gz
+sudo mv kalshi-cli /usr/local/bin/
+
+# Linux (ARM64)
+curl -LO https://github.com/6missedcalls/kalshi-cli/releases/latest/download/kalshi-cli_linux_arm64.tar.gz
+tar -xzf kalshi-cli_linux_arm64.tar.gz
+sudo mv kalshi-cli /usr/local/bin/
+```
+
+### Build from Source
+
+```bash
+git clone https://github.com/6missedcalls/kalshi-cli.git
+cd kalshi-cli
+go build -o kalshi-cli ./cmd/kalshi-cli
 ```
 
 ## Quick Start
 
 ```bash
-# 1. Authenticate (generates RSA key pair, stores in system keyring)
+# 1. Authenticate (interactive - generates RSA key pair, stores in system keyring)
 kalshi-cli auth login
 
 # 2. Check exchange status
-kalshi-cli exchange status --json
+kalshi-cli exchange status
 
-# 3. List open markets
-kalshi-cli markets list --status open --json
+# 3. Browse open markets
+kalshi-cli markets list --status open
 
-# 4. Get your balance
-kalshi-cli portfolio balance --json
+# 4. View your balance
+kalshi-cli portfolio balance
 
-# 5. Place an order (demo by default)
-kalshi-cli orders create --market TICKER --side yes --qty 10 --price 50 --yes --json
+# 5. Place an order on demo (default)
+kalshi-cli orders create --market TICKER --side yes --qty 10 --price 50
 
-# 6. Use production (real money)
-kalshi-cli --prod orders create --market TICKER --side yes --qty 10 --price 50 --yes --json
-```
+# 6. Stream live prices
+kalshi-cli watch ticker TICKER
 
-## Global Flags
-
-| Flag | Description | Bot Usage |
-|------|-------------|-----------|
-| `--json` | Output as JSON | **Always use for bots** |
-| `--plain` | Plain text output | For piping to other tools |
-| `--yes`, `-y` | Skip confirmation prompts | **Required for automation** |
-| `--prod` | Use production API | Default is demo (safe) |
-| `--verbose`, `-v` | Verbose output | Debugging |
-| `--config` | Custom config file path | Multi-account setups |
-
-**Bot Command Pattern:**
-```bash
-kalshi-cli --json --yes [command] [subcommand] [flags]
+# 7. When ready for production (real money)
+kalshi-cli --prod orders create --market TICKER --side yes --qty 10 --price 50
 ```
 
 ## Authentication
 
-### Initial Setup
+### Interactive Login
+
+The CLI generates a 4096-bit RSA key pair and stores credentials securely in your OS keyring:
+
 ```bash
-# Interactive login - generates 4096-bit RSA key pair
 kalshi-cli auth login
-# Follow prompts:
-# 1. Copy displayed public key
-# 2. Add to Kalshi dashboard (kalshi.com/account/api-keys)
-# 3. Enter API Key ID when prompted
 ```
 
-### Check Auth Status
+Follow the prompts to:
+1. Copy the displayed public key
+2. Add it to your Kalshi account at [kalshi.com/account/api-keys](https://kalshi.com/account/api-keys)
+3. Enter the API Key ID when prompted
+
+### Non-Interactive Login (Bots / CI)
+
+For automated systems, pass credentials directly:
+
+```bash
+# Via flags
+kalshi-cli auth login --api-key-id YOUR_KEY_ID --private-key-file /path/to/key.pem
+
+# Via environment variables
+export KALSHI_API_KEY_ID=your-key-id
+export KALSHI_PRIVATE_KEY="$(cat /path/to/key.pem)"
+kalshi-cli auth login
+```
+
+### Auth Status
+
 ```bash
 kalshi-cli auth status --json
 ```
+
 ```json
 {
   "logged_in": true,
@@ -114,297 +162,282 @@ kalshi-cli auth status --json
 }
 ```
 
-### Credentials Storage
-Credentials are stored in system keyring:
-- **macOS**: Keychain
-- **Linux**: Secret Service (GNOME Keyring)
-- **Windows**: Windows Credential Manager
+### API Key Management
 
-## Bot-Friendly Features
+```bash
+kalshi-cli auth keys list          # List API keys
+kalshi-cli auth keys create        # Create new API key
+kalshi-cli auth keys delete KEY_ID # Delete API key
+```
 
-1. **JSON Output**: All commands support `--json` for structured parsing
-2. **No Prompts**: Use `--yes` to skip all confirmations
-3. **Exit Codes**: Non-zero on errors for scripting
-4. **Idempotent**: Safe to retry failed commands
-5. **Demo Default**: Safe testing without `--prod` flag
+### Credential Storage
+
+Credentials are stored in your OS keyring - never in plaintext files:
+
+| OS | Backend |
+|----|---------|
+| macOS | Keychain |
+| Linux | Secret Service (GNOME Keyring) |
+| Windows | Credential Manager |
+
+### Logout
+
+```bash
+kalshi-cli auth logout
+```
+
+## Global Flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--json` | | Output as JSON (recommended for scripts) |
+| `--plain` | | Plain text output for piping |
+| `--yes` | `-y` | Skip all confirmation prompts |
+| `--prod` | | Use production API (default: demo) |
+| `--verbose` | `-v` | Verbose output for debugging |
+| `--config` | | Custom config file path |
+
+**Standard command pattern for automation:**
+
+```bash
+kalshi-cli --json --yes [command] [subcommand] [flags]
+```
 
 ## Command Reference
 
 ### Markets
 
-#### List Markets
 ```bash
-kalshi-cli markets list [--status open|closed|settled] [--series TICKER] [--limit 50] --json
-```
+# List markets with optional filters
+kalshi-cli markets list [--status open|closed|settled] [--series TICKER] [--limit 50]
 
-#### Get Market Details
-```bash
-kalshi-cli markets get TICKER --json
-```
+# Get details for a specific market
+kalshi-cli markets get TICKER
 
-#### Get Orderbook
-```bash
-kalshi-cli markets orderbook TICKER --json
-```
-Returns bids and asks with price/quantity.
+# View the orderbook
+kalshi-cli markets orderbook TICKER
 
-#### Get Trades
-```bash
-kalshi-cli markets trades TICKER [--limit 100] --json
-```
+# View recent trades
+kalshi-cli markets trades TICKER [--limit 100]
 
-#### Get Candlesticks
-```bash
-kalshi-cli markets candlesticks TICKER [--period 1m|5m|15m|1h|4h|1d] --json
-```
+# Get OHLCV candlestick data
+kalshi-cli markets candlesticks TICKER [--period 1m|5m|15m|1h|4h|1d]
 
-#### List/Get Series
-```bash
-kalshi-cli markets series list [--category CATEGORY] --json
-kalshi-cli markets series get TICKER --json
+# List and view market series
+kalshi-cli markets series list [--category CATEGORY]
+kalshi-cli markets series get TICKER
 ```
 
 ### Events
 
-#### List Events
 ```bash
-kalshi-cli events list [--status active] [--limit 50] --json
-```
+# List events
+kalshi-cli events list [--status active] [--limit 50]
 
-#### Get Event Details
-```bash
-kalshi-cli events get TICKER --json
-```
+# Get event details
+kalshi-cli events get TICKER
 
-#### Get Event Candlesticks
-```bash
-kalshi-cli events candlesticks TICKER [--period 1h] --json
-```
+# Event candlesticks
+kalshi-cli events candlesticks TICKER [--period 1h]
 
-#### Multivariate Events
-```bash
-kalshi-cli events multivariate list --json
-kalshi-cli events multivariate get TICKER --json
+# Multivariate events
+kalshi-cli events multivariate list
+kalshi-cli events multivariate get TICKER
 ```
 
 ### Orders
 
-#### List Orders
 ```bash
-kalshi-cli orders list [--status resting|executed|canceled] [--market TICKER] --json
-```
+# List orders with filters
+kalshi-cli orders list [--status resting|executed|canceled] [--market TICKER]
 
-#### Get Order
-```bash
-kalshi-cli orders get ORDER_ID --json
-```
+# Get a specific order
+kalshi-cli orders get ORDER_ID
 
-#### Create Order
-```bash
+# Create an order
 kalshi-cli orders create \
   --market TICKER \
   --side yes|no \
   --qty 10 \
   --price 50 \
   [--action buy|sell] \
-  [--type limit|market] \
-  --yes --json
+  [--type limit|market]
+
+# Amend an order (change price or quantity)
+kalshi-cli orders amend ORDER_ID --qty 20 [--price 55]
+
+# Cancel a single order
+kalshi-cli orders cancel ORDER_ID
+
+# Cancel all orders (optionally filtered by market)
+kalshi-cli orders cancel-all [--market TICKER]
+
+# Batch create from a JSON file
+kalshi-cli orders batch-create --file orders.json
+
+# Check queue position
+kalshi-cli orders queue ORDER_ID
 ```
 
-**Parameters:**
-- `--market`: Market ticker (required)
-- `--side`: `yes` or `no` (required)
-- `--qty`: Number of contracts (required)
-- `--price`: Price in cents, 1-99 (required for limit orders)
-- `--action`: `buy` (default) or `sell`
-- `--type`: `limit` (default) or `market`
+**Order parameters:**
 
-#### Cancel Order
-```bash
-kalshi-cli orders cancel ORDER_ID --yes --json
-```
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `--market` | Yes | Market ticker |
+| `--side` | Yes | `yes` or `no` |
+| `--qty` | Yes | Number of contracts |
+| `--price` | Limit only | Price in cents (1-99) |
+| `--action` | No | `buy` (default) or `sell` |
+| `--type` | No | `limit` (default) or `market` |
 
-#### Cancel All Orders
-```bash
-kalshi-cli orders cancel-all [--market TICKER] --yes --json
-```
+**Batch file format (`orders.json`):**
 
-#### Amend Order
-```bash
-kalshi-cli orders amend ORDER_ID --qty 20 [--price 55] --yes --json
-```
-
-#### Batch Create Orders
-```bash
-kalshi-cli orders batch-create --file orders.json --yes --json
-```
-
-**orders.json format:**
 ```json
 [
-  {"ticker": "MARKET1", "side": "yes", "action": "buy", "type": "limit", "count": 10, "yes_price": 50},
-  {"ticker": "MARKET2", "side": "no", "action": "buy", "type": "limit", "count": 5, "no_price": 30}
+  { "ticker": "MARKET1", "side": "yes", "action": "buy", "type": "limit", "count": 10, "yes_price": 50 },
+  { "ticker": "MARKET2", "side": "no", "action": "buy", "type": "limit", "count": 5, "no_price": 30 }
 ]
-```
-
-#### Get Queue Position
-```bash
-kalshi-cli orders queue ORDER_ID --json
 ```
 
 ### Portfolio
 
-#### Get Balance
 ```bash
-kalshi-cli portfolio balance --json
-```
-```json
-{
-  "available_balance": 10000,
-  "portfolio_value": 5000,
-  "total_balance": 15000
-}
-```
-*Values in cents*
+# Account balance (values in cents)
+kalshi-cli portfolio balance
 
-#### List Positions
-```bash
-kalshi-cli portfolio positions [--market TICKER] --json
-```
+# List positions
+kalshi-cli portfolio positions [--market TICKER]
 
-#### List Fills
-```bash
-kalshi-cli portfolio fills [--limit 100] --json
-```
+# Trade fills
+kalshi-cli portfolio fills [--limit 100]
 
-#### List Settlements
-```bash
-kalshi-cli portfolio settlements [--limit 50] --json
-```
+# Settlements
+kalshi-cli portfolio settlements [--limit 50]
 
-#### Subaccounts
-```bash
-kalshi-cli portfolio subaccounts list --json
-kalshi-cli portfolio subaccounts create --yes --json
-kalshi-cli portfolio subaccounts transfer --from 0 --to 1 --amount 1000 --yes --json
+# Subaccounts
+kalshi-cli portfolio subaccounts list
+kalshi-cli portfolio subaccounts create
+kalshi-cli portfolio subaccounts transfer --from 0 --to 1 --amount 1000
 ```
 
 ### Order Groups
 
-Order groups limit total fills across multiple orders.
+Order groups let you cap total fills across multiple orders.
 
 ```bash
-# List groups
-kalshi-cli order-groups list [--status active] --json
-# Alias: kalshi-cli og list --json
+# List groups (alias: og)
+kalshi-cli order-groups list [--status active]
+kalshi-cli og list
 
-# Get group
-kalshi-cli order-groups get GROUP_ID --json
+# Get group details
+kalshi-cli order-groups get GROUP_ID
 
-# Create group with 100 contract limit
-kalshi-cli order-groups create --limit 100 --json
+# Create with a fill limit
+kalshi-cli order-groups create --limit 100
 
-# Delete group
-kalshi-cli order-groups delete GROUP_ID --yes --json
+# Delete a group
+kalshi-cli order-groups delete GROUP_ID
 
 # Reset filled count
-kalshi-cli order-groups reset GROUP_ID --json
+kalshi-cli order-groups reset GROUP_ID
 
 # Trigger execution
-kalshi-cli order-groups trigger GROUP_ID --json
+kalshi-cli order-groups trigger GROUP_ID
 ```
 
 ### RFQ/Quotes
 
-Request for Quotes - for block trading.
+Request for Quotes workflow for block trading:
 
-#### RFQ Commands
 ```bash
-# List RFQs
-kalshi-cli rfq list [--status open] --json
+# RFQ commands
+kalshi-cli rfq list [--status open]
+kalshi-cli rfq get RFQ_ID
+kalshi-cli rfq create --market TICKER --side yes --qty 1000
+kalshi-cli rfq delete RFQ_ID
 
-# Get RFQ
-kalshi-cli rfq get RFQ_ID --json
-
-# Create RFQ
-kalshi-cli rfq create --market TICKER --side yes --qty 1000 --json
-
-# Delete RFQ
-kalshi-cli rfq delete RFQ_ID --yes --json
-```
-
-#### Quote Commands
-```bash
-# List quotes
-kalshi-cli quotes list [--rfq-id RFQ_ID] --json
-
-# Create quote
-kalshi-cli quotes create --rfq RFQ_ID --price 50 --json
-
-# Accept quote
-kalshi-cli quotes accept QUOTE_ID --yes --json
-
-# Confirm quote
-kalshi-cli quotes confirm QUOTE_ID --yes --json
+# Quote commands
+kalshi-cli quotes list [--rfq-id RFQ_ID]
+kalshi-cli quotes create --rfq RFQ_ID --price 50
+kalshi-cli quotes accept QUOTE_ID
+kalshi-cli quotes confirm QUOTE_ID
 ```
 
 ### Exchange
 
 ```bash
-# Exchange status
-kalshi-cli exchange status --json
-
-# Trading schedule
-kalshi-cli exchange schedule --json
-
-# Announcements
-kalshi-cli exchange announcements --json
+kalshi-cli exchange status         # Exchange status and trading hours
+kalshi-cli exchange schedule       # Trading schedule
+kalshi-cli exchange announcements  # Platform announcements
 ```
 
 ### Watch (WebSocket)
 
-Real-time streaming data. Output is newline-delimited JSON when using `--json`.
+Stream real-time data via WebSocket. Output is newline-delimited JSON with `--json`.
 
 ```bash
-# Price updates for a market
-kalshi-cli watch ticker MARKET_TICKER --json
+# Public channels (no auth required)
+kalshi-cli watch ticker TICKER      # Live price updates
+kalshi-cli watch orderbook TICKER   # Orderbook changes
+kalshi-cli watch trades             # Public trade feed
 
-# Orderbook updates
-kalshi-cli watch orderbook MARKET_TICKER --json
-
-# Public trades
-kalshi-cli watch trades [--market TICKER] --json
-
-# Your order updates (auth required)
-kalshi-cli watch orders --json
-
-# Your fill notifications (auth required)
-kalshi-cli watch fills --json
-
-# Your position changes (auth required)
-kalshi-cli watch positions --json
+# Authenticated channels
+kalshi-cli watch orders             # Your order updates
+kalshi-cli watch fills              # Your fill notifications
+kalshi-cli watch positions          # Your position changes
 ```
+
+WebSocket features:
+- Automatic reconnection with exponential backoff (1s-60s)
+- Ping/pong keepalive (10-second intervals)
+- Subscription persistence across reconnects
+- Thread-safe concurrent access
 
 ### Config
 
 ```bash
-# Show config
-kalshi-cli config show --json
-
-# Get value
-kalshi-cli config get output.format
-
-# Set value
-kalshi-cli config set output.format json
-kalshi-cli config set defaults.limit 100
+kalshi-cli config show              # Display current configuration
+kalshi-cli config get <key>         # Get a specific value
+kalshi-cli config set <key> <value> # Set a value
 ```
 
-## Common Bot Workflows
+Available config keys:
 
-### 1. Market Making Bot
+| Key | Default | Description |
+|-----|---------|-------------|
+| `api.production` | `false` | Use production environment |
+| `api.timeout` | `30s` | HTTP request timeout |
+| `output.format` | `table` | Output format: `table`, `json`, `plain` |
+| `output.color` | `true` | Colorized terminal output |
+| `defaults.limit` | `50` | Default result limit for list commands |
+
+## Bot Integration
+
+### Automation Flags
+
+| Flag | Purpose |
+|------|---------|
+| `--json` | Machine-parseable structured output |
+| `--yes` | Skip all interactive confirmations |
+| `--plain` | Unformatted text for piping |
+| `--prod` | Target production (omit for safe demo trading) |
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 2 | Authentication error |
+| 3 | Validation error |
+| 4 | API error |
+| 5 | Network error |
+
+### Example: Market Making Bot
+
 ```bash
 #!/bin/bash
-MARKET="BTC-100K-2024"
+MARKET="BTC-100K-2025"
 
 # Get current orderbook
 BOOK=$(kalshi-cli markets orderbook $MARKET --json)
@@ -413,54 +446,41 @@ BOOK=$(kalshi-cli markets orderbook $MARKET --json)
 BEST_BID=$(echo $BOOK | jq '.yes_bids[0].price // 0')
 BEST_ASK=$(echo $BOOK | jq '.yes_asks[0].price // 100')
 
-# Place orders at spread
-kalshi-cli orders create --market $MARKET --side yes --action buy --qty 10 --price $((BEST_BID + 1)) --yes --json
+# Place orders at the spread
+kalshi-cli orders create --market $MARKET --side yes --action buy  --qty 10 --price $((BEST_BID + 1)) --yes --json
 kalshi-cli orders create --market $MARKET --side yes --action sell --qty 10 --price $((BEST_ASK - 1)) --yes --json
 ```
 
-### 2. Position Monitor
+### Example: Position Monitor
+
 ```bash
 #!/bin/bash
-# Check positions and P&L
 kalshi-cli portfolio positions --json | jq '.[] | {ticker, position, pnl}'
-
-# Check balance
 kalshi-cli portfolio balance --json | jq '{available: .available_balance, total: .total_balance}'
 ```
 
-### 3. Order Management
+### Example: Real-Time Price Feed
+
 ```bash
 #!/bin/bash
-# Cancel all resting orders for a market
-kalshi-cli orders cancel-all --market BTC-100K --yes --json
-
-# Check order status
-ORDER_ID="order_abc123"
-kalshi-cli orders get $ORDER_ID --json | jq '.status'
-```
-
-### 4. Real-time Price Feed
-```bash
-#!/bin/bash
-# Stream prices and process with jq
 kalshi-cli watch ticker BTC-100K --json | while read line; do
   PRICE=$(echo $line | jq '.yes_price')
   echo "Current price: $PRICE"
-  # Add trading logic here
 done
 ```
 
-### 5. Multi-Market Scanner
+### Example: Multi-Market Scanner
+
 ```bash
 #!/bin/bash
-# Get all open markets and filter by volume
 kalshi-cli markets list --status open --limit 200 --json | \
   jq '.[] | select(.volume > 10000) | {ticker, yes_bid, yes_ask, volume}'
 ```
 
 ## JSON Output Schemas
 
-### Order Response
+### Order
+
 ```json
 {
   "order_id": "string",
@@ -477,7 +497,8 @@ kalshi-cli markets list --status open --limit 200 --json | \
 }
 ```
 
-### Position Response
+### Position
+
 ```json
 {
   "ticker": "string",
@@ -488,7 +509,8 @@ kalshi-cli markets list --status open --limit 200 --json | \
 }
 ```
 
-### Balance Response
+### Balance
+
 ```json
 {
   "available_balance": 10000,
@@ -497,7 +519,10 @@ kalshi-cli markets list --status open --limit 200 --json | \
 }
 ```
 
-### Market Response
+All monetary values are in **cents**.
+
+### Market
+
 ```json
 {
   "ticker": "string",
@@ -513,6 +538,7 @@ kalshi-cli markets list --status open --limit 200 --json | \
 ## Error Handling
 
 Errors are returned as JSON when using `--json`:
+
 ```json
 {
   "error": "API error [401] UNAUTHORIZED: Invalid API key",
@@ -520,55 +546,103 @@ Errors are returned as JSON when using `--json`:
 }
 ```
 
-Common error codes:
-- `UNAUTHORIZED` - Invalid or expired credentials
-- `FORBIDDEN` - Insufficient permissions
-- `NOT_FOUND` - Resource not found
-- `BAD_REQUEST` - Invalid parameters
-- `RATE_LIMITED` - Too many requests (retry with backoff)
-- `INSUFFICIENT_BALANCE` - Not enough funds
+| Error Code | Description |
+|------------|-------------|
+| `UNAUTHORIZED` | Invalid or expired credentials |
+| `FORBIDDEN` | Insufficient permissions |
+| `NOT_FOUND` | Resource not found |
+| `BAD_REQUEST` | Invalid parameters |
+| `RATE_LIMITED` | Too many requests (auto-retried) |
+| `INSUFFICIENT_BALANCE` | Not enough funds |
 
-## Exit Codes
+The CLI automatically retries rate-limited and transient server errors with exponential backoff (100ms initial, 10s max, 5 retries).
 
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | General error |
-| 2 | Authentication error |
-| 3 | Validation error |
-| 4 | API error |
-| 5 | Network error |
+## Configuration
 
-## Environment Variables
+Configuration is stored at `~/.kalshi/config.yaml` (created automatically on first run).
 
-```bash
-export KALSHI_API_PRODUCTION=true      # Use production API
-export KALSHI_API_TIMEOUT=60s          # Request timeout
-export KALSHI_OUTPUT_FORMAT=json       # Default output format
+```yaml
+api:
+  production: false
+  timeout: 30s
+output:
+  format: table
+  color: true
+defaults:
+  limit: 50
 ```
 
-## Rate Limits
+### Environment Variables
 
-Kalshi API has rate limits. The CLI implements automatic retry with exponential backoff:
-- Initial delay: 100ms
-- Max delay: 10s
-- Max retries: 5
+All config values can be overridden with environment variables:
 
-For high-frequency bots, implement your own rate limiting.
+```bash
+export KALSHI_API_PRODUCTION=true
+export KALSHI_API_TIMEOUT=60s
+export KALSHI_OUTPUT_FORMAT=json
+export KALSHI_API_KEY_ID=your-key-id
+export KALSHI_PRIVATE_KEY="$(cat /path/to/key.pem)"
+```
 
-## Demo vs Production
+### Demo vs Production
 
-| Environment | Flag | Base URL | Purpose |
-|-------------|------|----------|---------|
-| Demo | (default) | demo-api.kalshi.co | Testing, paper trading |
-| Production | `--prod` | api.kalshi.com | Real money trading |
+| | Demo | Production |
+|--|------|-----------|
+| **Flag** | (default) | `--prod` |
+| **API** | `demo-api.kalshi.co` | `api.elections.kalshi.com` |
+| **WebSocket** | `wss://demo-api.kalshi.co/trade-api/ws/v2` | `wss://api.elections.kalshi.com/trade-api/ws/v2` |
+| **Purpose** | Testing, paper trading | Real money trading |
 
-**Always test in demo first!**
+## Architecture
+
+```
+kalshi-cli/
+├── cmd/kalshi-cli/        # Entry point
+│   └── main.go
+├── internal/
+│   ├── api/               # HTTP client, auth signing, all API methods
+│   ├── cmd/               # Cobra command definitions
+│   ├── config/            # Viper config + keyring credential store
+│   ├── ui/                # Table and output formatting
+│   └── websocket/         # WebSocket client, channels, message routing
+├── pkg/
+│   └── models/            # Shared request/response types
+├── .goreleaser.yml        # Cross-platform release builds
+├── go.mod
+└── go.sum
+```
+
+**Key design decisions:**
+- **Cobra + Viper** for CLI framework and configuration
+- **Resty** HTTP client with automatic retry and rate-limit handling
+- **nhooyr.io/websocket** for WebSocket streaming with auto-reconnect
+- **OS keyring** for credential storage (never plaintext)
+- **RSA-SHA256 signatures** for API authentication (keys never leave your machine)
+- **Demo-first** - production requires explicit `--prod` flag
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Make your changes
+4. Run tests: `go test ./...`
+5. Run vet: `go vet ./...`
+6. Commit with conventional commits (`feat:`, `fix:`, `refactor:`, etc.)
+7. Open a pull request
+
+### Building
+
+```bash
+go build -o kalshi-cli ./cmd/kalshi-cli
+```
+
+### Testing
+
+```bash
+go test ./...
+go test -cover ./...
+```
 
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-Built for [OpenClaw.ai](https://openclaw.ai) trading bots.

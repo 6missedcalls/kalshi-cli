@@ -34,6 +34,26 @@ type EventMetadata struct {
 	Metadata    map[string]string `json:"metadata"`
 }
 
+// EventMetadataResponse is the API response for event metadata
+type EventMetadataResponse struct {
+	EventMetadata EventMetadata `json:"event_metadata"`
+}
+
+// ForecastPercentilePoint represents a single point in forecast history
+type ForecastPercentilePoint struct {
+	Timestamp time.Time `json:"timestamp"`
+	P10       int       `json:"p10"`
+	P25       int       `json:"p25"`
+	P50       int       `json:"p50"`
+	P75       int       `json:"p75"`
+	P90       int       `json:"p90"`
+}
+
+// ForecastPercentileHistoryResponse is the API response for forecast history
+type ForecastPercentileHistoryResponse struct {
+	History []ForecastPercentilePoint `json:"history"`
+}
+
 // MultivariateEvent represents a multivariate event
 type MultivariateEvent struct {
 	Ticker          string   `json:"ticker"`

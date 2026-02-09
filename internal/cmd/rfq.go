@@ -353,8 +353,7 @@ func runQuotesConfirm(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Note: Kalshi API uses AcceptQuote for confirmation
-	result, err := client.AcceptQuote(ctx, quoteID)
+	result, err := client.ConfirmQuote(ctx, quoteID)
 	if err != nil {
 		return err
 	}
