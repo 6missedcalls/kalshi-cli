@@ -213,7 +213,7 @@ func TestClient_Delete_Success(t *testing.T) {
 	client := createTestClientWithURL(t, server.URL)
 
 	ctx := context.Background()
-	resp, err := client.Delete(ctx, "/orders/123")
+	resp, err := client.DeleteRaw(ctx, "/orders/123")
 
 	if err != nil {
 		t.Fatalf("Delete failed: %v", err)

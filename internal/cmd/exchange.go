@@ -47,34 +47,10 @@ func init() {
 	exchangeCmd.AddCommand(exchangeAnnouncementsCmd)
 }
 
-func createAPIClient() (*api.Client, error) {
-	keyStore, err := config.NewKeyringStore()
-	if err != nil {
-		return nil, fmt.Errorf("failed to access keyring: %w", err)
-	}
-
-	creds, err := keyStore.GetCredentials()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get credentials: %w", err)
-	}
-
-	if creds == nil {
-		return nil, fmt.Errorf("no credentials found - run 'kalshi-cli auth login' first")
-	}
-
-	signer, err := api.NewSignerFromPEM(creds.APIKeyID, creds.PrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signer: %w", err)
-	}
-
-	cfg := GetConfig()
-	client := api.NewClient(signer, api.WithBaseURL(cfg.BaseURL()))
-
-	return client, nil
-}
+// createAPIClient is defined in helpers.go
 
 func runExchangeStatus(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -144,7 +120,7 @@ func boolToYesNo(b bool) string {
 }
 
 func runExchangeSchedule(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -212,7 +188,7 @@ func formatTime(t time.Time) string {
 }
 
 func runExchangeAnnouncements(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}

@@ -114,7 +114,7 @@ func init() {
 }
 
 func runBalance(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -150,7 +150,7 @@ func renderBalancePlain(balance *models.BalanceResponse) {
 }
 
 func runPositions(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -241,7 +241,7 @@ func abs(n int) int {
 }
 
 func runFills(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -316,7 +316,7 @@ func renderFillsPlain(fills []models.Fill) {
 }
 
 func runSettlements(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -378,7 +378,7 @@ func renderSettlementsPlain(settlements []models.Settlement) {
 }
 
 func runSubaccountsList(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -428,7 +428,7 @@ func renderSubaccountsPlain(subaccounts []models.Subaccount) {
 }
 
 func runSubaccountsCreate(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -467,7 +467,7 @@ func runSubaccountsTransfer(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}

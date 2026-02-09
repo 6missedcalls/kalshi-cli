@@ -118,7 +118,7 @@ func init() {
 }
 
 func runMarketsList(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -179,7 +179,7 @@ func outputMarketsList(markets []models.Market) error {
 func runMarketsGet(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func outputMarketDetails(market *models.Market) error {
 func runMarketsOrderbook(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func outputOrderbook(ob *models.Orderbook) error {
 func runMarketsTrades(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ func outputTrades(trades []models.Trade) error {
 func runMarketsCandlesticks(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -418,7 +418,7 @@ func outputCandlesticks(candles []models.Candlestick) error {
 }
 
 func runSeriesList(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -474,7 +474,7 @@ func outputSeriesList(series []models.Series) error {
 func runSeriesGet(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}

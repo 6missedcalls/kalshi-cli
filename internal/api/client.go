@@ -345,6 +345,8 @@ func (c *Client) DoRequest(ctx context.Context, method, path string, body interf
 		resp, err = req.Post(path)
 	case http.MethodPut:
 		resp, err = req.Put(path)
+	case http.MethodPatch:
+		resp, err = req.Patch(path)
 	case http.MethodDelete:
 		resp, err = req.Delete(path)
 	default:

@@ -101,7 +101,7 @@ func init() {
 }
 
 func runEventsList(cmd *cobra.Command, args []string) error {
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func runEventsList(cmd *cobra.Command, args []string) error {
 func runEventsGet(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -159,7 +159,7 @@ func runEventsGet(cmd *cobra.Command, args []string) error {
 func runEventsCandlesticks(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func runEventsCandlesticks(cmd *cobra.Command, args []string) error {
 }
 
 func runMultivariateList(cmd *cobra.Command, args []string) error {
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func runMultivariateList(cmd *cobra.Command, args []string) error {
 func runMultivariateGet(cmd *cobra.Command, args []string) error {
 	ticker := args[0]
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}

@@ -470,5 +470,5 @@ func createTestClient(t *testing.T, baseURL string) *Client {
 		t.Fatalf("failed to create signer: %v", err)
 	}
 
-	return NewClient(signer, WithBaseURL(baseURL))
+	return NewClientLegacy(signer, WithBaseURL(baseURL))
 }

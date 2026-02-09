@@ -8,7 +8,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/6missedcalls/kalshi-cli/internal/api"
-	"github.com/6missedcalls/kalshi-cli/internal/config"
 	"github.com/6missedcalls/kalshi-cli/internal/ui"
 	"github.com/6missedcalls/kalshi-cli/pkg/models"
 )
@@ -92,45 +91,19 @@ func init() {
 	orderGroupsCreateCmd.MarkFlagRequired("limit")
 }
 
-func getAPIClient() (*api.Client, error) {
-	keyring, err := config.NewKeyringStore()
-	if err != nil {
-		return nil, fmt.Errorf("failed to access keyring: %w", err)
-	}
-
-	creds, err := keyring.GetCredentials()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get credentials: %w", err)
-	}
-
-	if creds == nil {
-		return nil, fmt.Errorf("not authenticated. Run 'kalshi-cli auth login' first")
-	}
-
-	signer, err := api.NewSignerFromPEM(creds.APIKeyID, creds.PrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signer: %w", err)
-	}
-
-	cfg := GetConfig()
-	opts := []api.ClientOption{
-		api.WithBaseURL(cfg.BaseURL()),
-	}
-
-	return api.NewClient(signer, opts...), nil
-}
+// getAPIClient uses createClient from helpers.go
 
 func runOrderGroupsList(cmd *cobra.Command, args []string) error {
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
 
-	params := api.ListOrderGroupsParams{
+	opts := api.OrderGroupsOptions{
 		Status: orderGroupStatus,
 	}
 
-	result, err := client.ListOrderGroups(context.Background(), params)
+	result, err := client.GetOrderGroups(context.Background(), opts)
 	if err != nil {
 		return err
 	}
@@ -141,17 +114,17 @@ func runOrderGroupsList(cmd *cobra.Command, args []string) error {
 func runOrderGroupsGet(cmd *cobra.Command, args []string) error {
 	groupID := args[0]
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
 
-	orderGroup, err := client.GetOrderGroup(context.Background(), groupID)
+	result, err := client.GetOrderGroup(context.Background(), groupID)
 	if err != nil {
 		return err
 	}
 
-	return outputOrderGroupDetails(orderGroup)
+	return outputOrderGroupDetails(&result.OrderGroup)
 }
 
 func runOrderGroupsCreate(cmd *cobra.Command, args []string) error {
@@ -159,18 +132,19 @@ func runOrderGroupsCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("limit must be a positive integer")
 	}
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
 
-	orderGroup, err := client.CreateOrderGroup(context.Background(), orderGroupLimit)
+	req := models.CreateOrderGroupRequest{Limit: orderGroupLimit}
+	result, err := client.CreateOrderGroup(context.Background(), req)
 	if err != nil {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Created order group: %s", orderGroup.GroupID))
-	return outputOrderGroupDetails(orderGroup)
+	PrintSuccess(fmt.Sprintf("Created order group: %s", result.OrderGroup.GroupID))
+	return outputOrderGroupDetails(&result.OrderGroup)
 }
 
 func runOrderGroupsDelete(cmd *cobra.Command, args []string) error {
@@ -186,7 +160,7 @@ func runOrderGroupsDelete(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -202,35 +176,35 @@ func runOrderGroupsDelete(cmd *cobra.Command, args []string) error {
 func runOrderGroupsReset(cmd *cobra.Command, args []string) error {
 	groupID := args[0]
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
 
-	orderGroup, err := client.ResetOrderGroup(context.Background(), groupID)
+	result, err := client.ResetOrderGroup(context.Background(), groupID)
 	if err != nil {
 		return err
 	}
 
 	PrintSuccess(fmt.Sprintf("Reset order group: %s", groupID))
-	return outputOrderGroupDetails(orderGroup)
+	return outputOrderGroupDetails(&result.OrderGroup)
 }
 
 func runOrderGroupsTrigger(cmd *cobra.Command, args []string) error {
 	groupID := args[0]
 
-	client, err := getAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
 
-	orderGroup, err := client.TriggerOrderGroup(context.Background(), groupID)
+	result, err := client.TriggerOrderGroup(context.Background(), groupID)
 	if err != nil {
 		return err
 	}
 
 	PrintSuccess(fmt.Sprintf("Triggered order group: %s", groupID))
-	return outputOrderGroupDetails(orderGroup)
+	return outputOrderGroupDetails(&result.OrderGroup)
 }
 
 func outputOrderGroupsList(groups []models.OrderGroup) error {

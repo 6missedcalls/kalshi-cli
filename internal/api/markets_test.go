@@ -670,7 +670,7 @@ func TestGetSeries(t *testing.T) {
 func newTestClient(t *testing.T, serverURL string) *Client {
 	t.Helper()
 	signer := newTestSigner(t)
-	return NewClient(signer, WithBaseURL(serverURL))
+	return NewClientLegacy(signer, WithBaseURL(serverURL))
 }
 
 // newTestSigner creates a test signer with a generated key

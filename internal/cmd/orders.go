@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,7 +11,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/6missedcalls/kalshi-cli/internal/api"
-	"github.com/6missedcalls/kalshi-cli/internal/config"
 	"github.com/6missedcalls/kalshi-cli/internal/ui"
 	"github.com/6missedcalls/kalshi-cli/pkg/models"
 )
@@ -153,30 +151,7 @@ func init() {
 	ordersBatchCreateCmd.MarkFlagRequired("file")
 }
 
-func createAPIClient() (*api.Client, error) {
-	keyStore, err := config.NewKeyringStore()
-	if err != nil {
-		return nil, fmt.Errorf("failed to access keyring: %w", err)
-	}
-
-	creds, err := keyStore.GetCredentials()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get credentials: %w", err)
-	}
-	if creds == nil {
-		return nil, fmt.Errorf("no credentials found - run 'kalshi-cli auth login' first")
-	}
-
-	signer, err := api.NewSignerFromPEM(creds.APIKeyID, creds.PrivateKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create signer: %w", err)
-	}
-
-	cfg := GetConfig()
-	client := api.NewClient(signer, api.WithBaseURL(cfg.BaseURL()))
-
-	return client, nil
-}
+// createAPIClient is defined in helpers.go
 
 func getEnvironmentLabel() string {
 	cfg := GetConfig()
@@ -188,7 +163,7 @@ func getEnvironmentLabel() string {
 
 
 func runOrdersList(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -210,7 +185,7 @@ func runOrdersList(cmd *cobra.Command, args []string) error {
 		path += api.BuildQueryString(params)
 	}
 
-	if err := client.Get(ctx, path, &response); err != nil {
+	if err := client.GetJSON(ctx, path, &response); err != nil {
 		return fmt.Errorf("failed to list orders: %w", err)
 	}
 
@@ -225,7 +200,7 @@ func runOrdersList(cmd *cobra.Command, args []string) error {
 func runOrdersGet(cmd *cobra.Command, args []string) error {
 	orderID := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -236,7 +211,7 @@ func runOrdersGet(cmd *cobra.Command, args []string) error {
 	var response models.OrderResponse
 	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s", orderID)
 
-	if err := client.Get(ctx, path, &response); err != nil {
+	if err := client.GetJSON(ctx, path, &response); err != nil {
 		return fmt.Errorf("failed to get order: %w", err)
 	}
 
@@ -329,7 +304,7 @@ func runOrdersCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Submit order
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -338,7 +313,7 @@ func runOrdersCreate(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	var response models.CreateOrderResponse
-	if err := client.Post(ctx, "/trade-api/v2/portfolio/orders", orderReq, &response); err != nil {
+	if err := client.PostJSON(ctx, "/trade-api/v2/portfolio/orders", orderReq, &response); err != nil {
 		return fmt.Errorf("failed to create order: %w", err)
 	}
 
@@ -361,7 +336,7 @@ func runOrdersCancel(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -372,7 +347,7 @@ func runOrdersCancel(cmd *cobra.Command, args []string) error {
 	var response models.OrderResponse
 	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s", orderID)
 
-	if err := client.Delete(ctx, path, &response); err != nil {
+	if err := client.DeleteJSON(ctx, path, &response); err != nil {
 		return fmt.Errorf("failed to cancel order: %w", err)
 	}
 
@@ -399,7 +374,7 @@ func runOrdersCancelAll(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -466,7 +441,7 @@ func runOrdersAmend(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -477,7 +452,7 @@ func runOrdersAmend(cmd *cobra.Command, args []string) error {
 	var response models.OrderResponse
 	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s", orderID)
 
-	if err := client.Put(ctx, path, amendReq, &response); err != nil {
+	if err := client.PutJSON(ctx, path, amendReq, &response); err != nil {
 		return fmt.Errorf("failed to amend order: %w", err)
 	}
 
@@ -562,7 +537,7 @@ func runOrdersBatchCreate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -573,7 +548,7 @@ func runOrdersBatchCreate(cmd *cobra.Command, args []string) error {
 	batchReq := models.BatchCreateOrdersRequest{Orders: orders}
 	var response models.BatchCreateOrdersResponse
 
-	if err := client.Post(ctx, "/trade-api/v2/portfolio/orders/batched", batchReq, &response); err != nil {
+	if err := client.PostJSON(ctx, "/trade-api/v2/portfolio/orders/batched", batchReq, &response); err != nil {
 		return fmt.Errorf("failed to create batch orders: %w", err)
 	}
 
@@ -590,7 +565,7 @@ func runOrdersBatchCreate(cmd *cobra.Command, args []string) error {
 func runOrdersQueue(cmd *cobra.Command, args []string) error {
 	orderID := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -601,7 +576,7 @@ func runOrdersQueue(cmd *cobra.Command, args []string) error {
 	var response models.QueuePositionsResponse
 	path := fmt.Sprintf("/trade-api/v2/portfolio/orders/%s/queue", orderID)
 
-	if err := client.Get(ctx, path, &response); err != nil {
+	if err := client.GetJSON(ctx, path, &response); err != nil {
 		return fmt.Errorf("failed to get queue position: %w", err)
 	}
 
@@ -646,12 +621,12 @@ func renderOrdersTable(orders []models.Order) {
 		}
 
 		rows = append(rows, []string{
-			truncateID(order.OrderID),
+			truncateOrderID(order.OrderID),
 			order.Ticker,
 			strings.ToUpper(string(order.Side)),
 			fmt.Sprintf("%d", price),
 			fmt.Sprintf("%d/%d", order.RemainingQuantity, order.InitialQuantity),
-			formatOrderStatus(order.Status),
+			formatOrderStatusModel(order.Status),
 			order.CreatedTime.Format("2006-01-02 15:04"),
 		})
 	}
@@ -685,7 +660,7 @@ func renderOrderDetails(order models.Order) {
 	pairs := [][]string{
 		{"Order ID", order.OrderID},
 		{"Market", order.Ticker},
-		{"Status", formatOrderStatus(order.Status)},
+		{"Status", formatOrderStatusModel(order.Status)},
 		{"Side", strings.ToUpper(string(order.Side))},
 		{"Action", strings.ToUpper(string(order.Action))},
 		{"Type", strings.ToUpper(string(order.Type))},
@@ -740,7 +715,7 @@ func renderOrderPlain(order models.Order) {
 	)
 }
 
-func formatOrderStatus(status models.OrderStatus) string {
+func formatOrderStatusModel(status models.OrderStatus) string {
 	switch status {
 	case models.OrderStatusResting:
 		return ui.StatusActiveStyle.Render("RESTING")
@@ -755,7 +730,7 @@ func formatOrderStatus(status models.OrderStatus) string {
 	}
 }
 
-func truncateID(id string) string {
+func truncateOrderID(id string) string {
 	if len(id) > 12 {
 		return id[:12] + "..."
 	}

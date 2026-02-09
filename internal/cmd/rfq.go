@@ -143,7 +143,7 @@ func init() {
 }
 
 func runRFQList(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -151,7 +151,7 @@ func runRFQList(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := client.ListRFQs(ctx, api.ListRFQsParams{
+	result, err := client.GetRFQs(ctx, api.RFQsOptions{
 		Status: rfqStatus,
 	})
 	if err != nil {
@@ -169,7 +169,7 @@ func runRFQList(cmd *cobra.Command, args []string) error {
 func runRFQGet(cmd *cobra.Command, args []string) error {
 	rfqID := args[0]
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -177,16 +177,16 @@ func runRFQGet(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	rfq, err := client.GetRFQ(ctx, rfqID)
+	result, err := client.GetRFQ(ctx, rfqID)
 	if err != nil {
 		return err
 	}
 
 	return ui.Output(
 		GetOutputFormat(),
-		func() { renderRFQDetail(rfq) },
-		rfq,
-		func() { renderRFQDetailPlain(rfq) },
+		func() { renderRFQDetail(&result.RFQ) },
+		result.RFQ,
+		func() { renderRFQDetailPlain(&result.RFQ) },
 	)
 }
 
@@ -200,7 +200,7 @@ func runRFQCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("quantity must be greater than 0")
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -208,7 +208,7 @@ func runRFQCreate(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	rfq, err := client.CreateRFQ(ctx, models.CreateRFQRequest{
+	result, err := client.CreateRFQ(ctx, models.CreateRFQRequest{
 		Ticker:   rfqMarket,
 		Side:     side,
 		Quantity: rfqQuantity,
@@ -217,13 +217,13 @@ func runRFQCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("RFQ created: %s", rfq.RFQID))
+	PrintSuccess(fmt.Sprintf("RFQ created: %s", result.RFQ.RFQID))
 
 	return ui.Output(
 		GetOutputFormat(),
-		func() { renderRFQDetail(rfq) },
-		rfq,
-		func() { renderRFQDetailPlain(rfq) },
+		func() { renderRFQDetail(&result.RFQ) },
+		result.RFQ,
+		func() { renderRFQDetailPlain(&result.RFQ) },
 	)
 }
 
@@ -235,7 +235,7 @@ func runRFQDelete(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func runRFQDelete(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := client.DeleteRFQ(ctx, rfqID); err != nil {
+	if err := client.CancelRFQ(ctx, rfqID); err != nil {
 		return err
 	}
 
@@ -252,7 +252,7 @@ func runRFQDelete(cmd *cobra.Command, args []string) error {
 }
 
 func runQuotesList(cmd *cobra.Command, args []string) error {
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func runQuotesList(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	result, err := client.ListQuotes(ctx, api.ListQuotesParams{
+	result, err := client.GetQuotes(ctx, api.QuotesOptions{
 		RFQID: quoteRFQID,
 	})
 	if err != nil {
@@ -280,7 +280,7 @@ func runQuotesCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("price must be between 1 and 99 cents, got: %d", quotePrice)
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -288,7 +288,7 @@ func runQuotesCreate(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	quote, err := client.CreateQuote(ctx, models.CreateQuoteRequest{
+	result, err := client.CreateQuote(ctx, models.CreateQuoteRequest{
 		RFQID: quoteRFQID,
 		Price: quotePrice,
 	})
@@ -296,13 +296,13 @@ func runQuotesCreate(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Quote created: %s", quote.QuoteID))
+	PrintSuccess(fmt.Sprintf("Quote created: %s", result.Quote.QuoteID))
 
 	return ui.Output(
 		GetOutputFormat(),
-		func() { renderQuoteDetail(quote) },
-		quote,
-		func() { renderQuoteDetailPlain(quote) },
+		func() { renderQuoteDetail(&result.Quote) },
+		result.Quote,
+		func() { renderQuoteDetailPlain(&result.Quote) },
 	)
 }
 
@@ -314,7 +314,7 @@ func runQuotesAccept(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -322,18 +322,18 @@ func runQuotesAccept(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	quote, err := client.AcceptQuote(ctx, quoteID)
+	result, err := client.AcceptQuote(ctx, quoteID)
 	if err != nil {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Quote %s accepted", quote.QuoteID))
+	PrintSuccess(fmt.Sprintf("Quote %s accepted", result.Quote.QuoteID))
 
 	return ui.Output(
 		GetOutputFormat(),
-		func() { renderQuoteDetail(quote) },
-		quote,
-		func() { renderQuoteDetailPlain(quote) },
+		func() { renderQuoteDetail(&result.Quote) },
+		result.Quote,
+		func() { renderQuoteDetailPlain(&result.Quote) },
 	)
 }
 
@@ -345,7 +345,7 @@ func runQuotesConfirm(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	client, err := createAPIClient()
+	client, err := createClient()
 	if err != nil {
 		return err
 	}
@@ -353,18 +353,19 @@ func runQuotesConfirm(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	quote, err := client.ConfirmQuote(ctx, quoteID)
+	// Note: Kalshi API uses AcceptQuote for confirmation
+	result, err := client.AcceptQuote(ctx, quoteID)
 	if err != nil {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Quote %s confirmed", quote.QuoteID))
+	PrintSuccess(fmt.Sprintf("Quote %s confirmed", result.Quote.QuoteID))
 
 	return ui.Output(
 		GetOutputFormat(),
-		func() { renderQuoteDetail(quote) },
-		quote,
-		func() { renderQuoteDetailPlain(quote) },
+		func() { renderQuoteDetail(&result.Quote) },
+		result.Quote,
+		func() { renderQuoteDetailPlain(&result.Quote) },
 	)
 }
 

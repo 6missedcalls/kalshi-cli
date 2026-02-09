@@ -511,6 +511,6 @@ func createAuthenticatedClient(creds config.Credentials) (*api.Client, error) {
 		return nil, fmt.Errorf("failed to create signer: %w", err)
 	}
 
-	client := api.NewClient(signer, api.WithBaseURL(cfg.BaseURL()))
+	client := api.NewClient(cfg, signer)
 	return client, nil
 }
