@@ -68,6 +68,7 @@ func TestGetExchangeStatus(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -162,6 +163,7 @@ func TestGetExchangeSchedule(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -255,6 +257,7 @@ func TestGetAnnouncements(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -338,6 +341,7 @@ func TestGetFeeChanges(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)

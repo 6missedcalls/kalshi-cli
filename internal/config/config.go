@@ -11,10 +11,10 @@ import (
 
 const (
 	DemoBaseURL = "https://demo-api.kalshi.co/trade-api/v2"
-	ProdBaseURL = "https://api.kalshi.com/trade-api/v2"
+	ProdBaseURL = "https://api.elections.kalshi.com/trade-api/v2"
 
 	DemoWSURL = "wss://demo-api.kalshi.co/trade-api/ws/v2"
-	ProdWSURL = "wss://api.kalshi.com/trade-api/ws/v2"
+	ProdWSURL = "wss://api.elections.kalshi.com/trade-api/ws/v2"
 )
 
 type Config struct {

@@ -111,6 +111,7 @@ func TestListMarkets(t *testing.T) {
 					}
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -206,6 +207,7 @@ func TestGetMarket(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -295,6 +297,7 @@ func TestGetOrderbook(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -381,6 +384,7 @@ func TestGetTrades(t *testing.T) {
 					}
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -469,6 +473,7 @@ func TestGetCandlesticks(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -568,6 +573,7 @@ func TestListSeries(t *testing.T) {
 					}
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -638,6 +644,7 @@ func TestGetSeries(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)

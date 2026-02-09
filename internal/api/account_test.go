@@ -70,6 +70,7 @@ func TestListAPIKeys(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -169,6 +170,7 @@ func TestCreateAPIKey(t *testing.T) {
 					t.Errorf("expected name %q, got %q", tt.request.Name, req.Name)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
 					json.NewEncoder(w).Encode(tt.serverResponse)
@@ -252,6 +254,7 @@ func TestDeleteAPIKey(t *testing.T) {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 			}))
 			defer server.Close()
