@@ -39,11 +39,16 @@ API keys are provisioned by Kalshi. To get your credentials:
   2. Click "Generate API Key"
   3. Save the API Key ID and Private Key (shown only once!)
 
-This command will:
-  1. Prompt for your API Key ID
-  2. Prompt for your Private Key (paste PEM or provide file path)
-  3. Store credentials securely in the system keyring
-  4. Test the authentication`,
+Interactive mode:
+  kalshi-cli auth login
+
+Non-interactive mode (for bots/automation):
+  kalshi-cli auth login --api-key-id <id> --private-key-file /path/to/key.pem
+  kalshi-cli auth login --api-key-id <id> --private-key "$(cat key.pem)"
+
+Environment variables:
+  KALSHI_API_KEY_ID    - API Key ID
+  KALSHI_PRIVATE_KEY   - Private key PEM content`,
 	RunE: runLogin,
 }
 
@@ -89,7 +94,12 @@ var keysDeleteCmd = &cobra.Command{
 	RunE:  runKeysDelete,
 }
 
-var keyName string
+var (
+	keyName        string
+	loginAPIKeyID  string
+	loginPrivKey   string
+	loginPrivKeyFile string
+)
 
 func init() {
 	rootCmd.AddCommand(authCmd)
@@ -103,6 +113,11 @@ func init() {
 	keysCmd.AddCommand(keysCreateCmd)
 	keysCmd.AddCommand(keysDeleteCmd)
 
+	// Login flags for non-interactive/bot usage
+	loginCmd.Flags().StringVar(&loginAPIKeyID, "api-key-id", "", "API Key ID from Kalshi (or set KALSHI_API_KEY_ID env var)")
+	loginCmd.Flags().StringVar(&loginPrivKey, "private-key", "", "Private key PEM content (or set KALSHI_PRIVATE_KEY env var)")
+	loginCmd.Flags().StringVar(&loginPrivKeyFile, "private-key-file", "", "Path to private key PEM file")
+
 	keysCreateCmd.Flags().StringVar(&keyName, "name", "", "name for the new API key")
 }
 
@@ -112,65 +127,10 @@ func runLogin(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to access keyring: %w", err)
 	}
 
-	if keyring.HasCredentials() {
-		existingCreds, err := keyring.GetCredentials()
-		if err == nil && existingCreds != nil {
-			fmt.Println(ui.WarningStyle.Render("You are already logged in."))
-			fmt.Printf("API Key ID: %s\n", existingCreds.APIKeyID)
-			fmt.Println()
-
-			if !SkipConfirmation() {
-				fmt.Print("Do you want to log out and enter new credentials? [y/N]: ")
-				reader := bufio.NewReader(os.Stdin)
-				response, _ := reader.ReadString('\n')
-				response = strings.TrimSpace(strings.ToLower(response))
-				if response != "y" && response != "yes" {
-					fmt.Println("Login cancelled.")
-					return nil
-				}
-			}
-
-			if err := keyring.DeleteCredentials(); err != nil {
-				return fmt.Errorf("failed to clear existing credentials: %w", err)
-			}
-		}
-	}
-
-	fmt.Println(ui.TitleStyle.Render("Kalshi API Authentication"))
-	fmt.Println()
-	fmt.Println("API keys are provisioned by Kalshi. If you don't have credentials yet:")
-	fmt.Println("  1. Go to https://kalshi.com/account/api (or demo: https://demo.kalshi.com/account/api)")
-	fmt.Println("  2. Click 'Generate API Key'")
-	fmt.Println("  3. Save the API Key ID and Private Key (shown only once!)")
-	fmt.Println()
-
-	reader := bufio.NewReader(os.Stdin)
-
-	// Get API Key ID
-	fmt.Print("Enter your API Key ID: ")
-	apiKeyID, err := reader.ReadString('\n')
+	// Resolve credentials from flags, env vars, or interactive input
+	apiKeyID, privateKeyPEM, err := resolveLoginCredentials(keyring)
 	if err != nil {
-		return fmt.Errorf("failed to read input: %w", err)
-	}
-	apiKeyID = strings.TrimSpace(apiKeyID)
-
-	if apiKeyID == "" {
-		return fmt.Errorf("API Key ID is required")
-	}
-
-	// Get Private Key (file path or paste)
-	fmt.Println()
-	fmt.Println("Enter your Private Key (paste PEM content or provide file path):")
-	fmt.Println("(If pasting, enter the full PEM including BEGIN/END lines, then press Enter twice)")
-	fmt.Println()
-
-	privateKeyPEM, err := readPrivateKeyInput(reader)
-	if err != nil {
-		return fmt.Errorf("failed to read private key: %w", err)
-	}
-
-	if privateKeyPEM == "" {
-		return fmt.Errorf("private key is required")
+		return err
 	}
 
 	creds := config.Credentials{
@@ -217,6 +177,103 @@ func runLogin(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Environment: %s\n", cfg.Environment())
 
 	return nil
+}
+
+// resolveLoginCredentials gets credentials from flags, env vars, or interactive input
+func resolveLoginCredentials(keyring *config.KeyringStore) (apiKeyID, privateKeyPEM string, err error) {
+	// Check for existing credentials
+	if keyring.HasCredentials() {
+		existingCreds, err := keyring.GetCredentials()
+		if err == nil && existingCreds != nil {
+			fmt.Println(ui.WarningStyle.Render("You are already logged in."))
+			fmt.Printf("API Key ID: %s\n", existingCreds.APIKeyID)
+			fmt.Println()
+
+			if !SkipConfirmation() {
+				fmt.Print("Do you want to log out and enter new credentials? [y/N]: ")
+				reader := bufio.NewReader(os.Stdin)
+				response, _ := reader.ReadString('\n')
+				response = strings.TrimSpace(strings.ToLower(response))
+				if response != "y" && response != "yes" {
+					return "", "", fmt.Errorf("login cancelled")
+				}
+			}
+
+			if err := keyring.DeleteCredentials(); err != nil {
+				return "", "", fmt.Errorf("failed to clear existing credentials: %w", err)
+			}
+		}
+	}
+
+	// Try to get API Key ID from flag, then env var
+	apiKeyID = loginAPIKeyID
+	if apiKeyID == "" {
+		apiKeyID = os.Getenv("KALSHI_API_KEY_ID")
+	}
+
+	// Try to get private key from file flag, string flag, then env var
+	if loginPrivKeyFile != "" {
+		content, err := os.ReadFile(loginPrivKeyFile)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to read private key file: %w", err)
+		}
+		privateKeyPEM = string(content)
+	} else if loginPrivKey != "" {
+		privateKeyPEM = loginPrivKey
+	} else {
+		privateKeyPEM = os.Getenv("KALSHI_PRIVATE_KEY")
+	}
+
+	// If we have both from non-interactive sources, we're done
+	if apiKeyID != "" && privateKeyPEM != "" {
+		fmt.Println(ui.TitleStyle.Render("Kalshi API Authentication (non-interactive)"))
+		fmt.Printf("API Key ID: %s\n", apiKeyID)
+		return apiKeyID, privateKeyPEM, nil
+	}
+
+	// Interactive mode
+	fmt.Println(ui.TitleStyle.Render("Kalshi API Authentication"))
+	fmt.Println()
+	fmt.Println("API keys are provisioned by Kalshi. If you don't have credentials yet:")
+	fmt.Println("  1. Go to https://kalshi.com/account/api (or demo: https://demo.kalshi.com/account/api)")
+	fmt.Println("  2. Click 'Generate API Key'")
+	fmt.Println("  3. Save the API Key ID and Private Key (shown only once!)")
+	fmt.Println()
+
+	reader := bufio.NewReader(os.Stdin)
+
+	// Get API Key ID if not provided
+	if apiKeyID == "" {
+		fmt.Print("Enter your API Key ID: ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			return "", "", fmt.Errorf("failed to read input: %w", err)
+		}
+		apiKeyID = strings.TrimSpace(input)
+	}
+
+	if apiKeyID == "" {
+		return "", "", fmt.Errorf("API Key ID is required")
+	}
+
+	// Get Private Key if not provided
+	if privateKeyPEM == "" {
+		fmt.Println()
+		fmt.Println("Enter your Private Key (paste PEM content or provide file path):")
+		fmt.Println("(If pasting, enter the full PEM including BEGIN/END lines, then press Enter twice)")
+		fmt.Println()
+
+		privateKeyPEM, err = readPrivateKeyInput(reader)
+		if err != nil {
+			return "", "", fmt.Errorf("failed to read private key: %w", err)
+		}
+	}
+
+	if privateKeyPEM == "" {
+		return "", "", fmt.Errorf("private key is required")
+	}
+
+	return apiKeyID, privateKeyPEM, nil
 }
 
 // readPrivateKeyInput reads a private key from stdin (multi-line PEM) or a file path
