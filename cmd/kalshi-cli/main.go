@@ -15,6 +15,7 @@ var (
 func main() {
 	cmd.SetVersionInfo(version, commit, date)
 	if err := cmd.Execute(); err != nil {
+		cmd.PrintError(err)
 		os.Exit(1)
 	}
 }
