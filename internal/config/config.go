@@ -10,9 +10,11 @@ import (
 )
 
 const (
-	DemoBaseURL = "https://demo-api.kalshi.co/trade-api/v2"
-	ProdBaseURL = "https://api.elections.kalshi.com/trade-api/v2"
+	// Base URLs WITHOUT the /trade-api/v2 prefix (added by API methods)
+	DemoBaseURL = "https://demo-api.kalshi.co"
+	ProdBaseURL = "https://api.elections.kalshi.com"
 
+	// WebSocket URLs (these need the full path)
 	DemoWSURL = "wss://demo-api.kalshi.co/trade-api/ws/v2"
 	ProdWSURL = "wss://api.elections.kalshi.com/trade-api/ws/v2"
 )
