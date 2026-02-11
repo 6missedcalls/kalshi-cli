@@ -2,8 +2,10 @@ package api
 
 import (
 	"context"
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -269,6 +271,68 @@ func TestClient_RequestSigning(t *testing.T) {
 	_, parseErr := strconv.ParseInt(receivedTimestamp, 10, 64)
 	if parseErr != nil {
 		t.Errorf("KALSHI-ACCESS-TIMESTAMP should be milliseconds since epoch, got: %s", receivedTimestamp)
+	}
+}
+
+func TestClient_SigningExcludesQueryParams(t *testing.T) {
+	// Bug: when a URL has query params (e.g. /path?limit=50),
+	// the signed message should use only the path portion,
+	// NOT include the query string. Kalshi API rejects signatures
+	// that include query params in the signed message.
+
+	var receivedSignature string
+	var receivedTimestamp string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedSignature = r.Header.Get("KALSHI-ACCESS-SIGNATURE")
+		receivedTimestamp = r.Header.Get("KALSHI-ACCESS-TIMESTAMP")
+
+		// Verify query params are present in the actual HTTP request
+		if r.URL.Query().Get("limit") != "50" {
+			t.Errorf("expected query param limit=50, got %s", r.URL.RawQuery)
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	signer := createTestSigner(t)
+	client := createTestClientWithURLAndSigner(t, server.URL, signer)
+
+	ctx := context.Background()
+	_, err := client.Get(ctx, "/trade-api/v2/portfolio/settlements?limit=50")
+	if err != nil {
+		t.Fatalf("Get failed: %v", err)
+	}
+
+	// Parse the timestamp that was sent
+	tsMs, err := strconv.ParseInt(receivedTimestamp, 10, 64)
+	if err != nil {
+		t.Fatalf("failed to parse timestamp: %v", err)
+	}
+	ts := time.UnixMilli(tsMs)
+
+	// Verify: the signature should be valid for the path WITHOUT query params.
+	// RSA-PSS is non-deterministic, so we verify by checking the signature
+	// against the expected message using the public key.
+	sigBytes, err := base64.StdEncoding.DecodeString(receivedSignature)
+	if err != nil {
+		t.Fatalf("failed to decode signature: %v", err)
+	}
+
+	// The expected signed message uses path WITHOUT query params
+	expectedMsg := BuildAuthMessage(ts, "GET", "/trade-api/v2/portfolio/settlements")
+	h := crypto.SHA256.New()
+	h.Write([]byte(expectedMsg))
+	hashed := h.Sum(nil)
+
+	// Verify: if signing excluded query params, this should succeed
+	err = rsa.VerifyPSS(&signer.privateKey.PublicKey, crypto.SHA256, hashed, sigBytes, &rsa.PSSOptions{
+		SaltLength: rsa.PSSSaltLengthEqualsHash,
+	})
+	if err != nil {
+		t.Errorf("signature verification failed: query params were included in signed path\n"+
+			"  The signed message should use path only (no query string)\n"+
+			"  verification error: %v", err)
 	}
 }
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"strings"
 	"net/url"
 	"strconv"
 	"time"
@@ -138,6 +139,11 @@ func (c *Client) signRequest(client *resty.Client, req *resty.Request) error {
 
 	timestamp := time.Now().UTC()
 	path := req.URL
+
+	// Strip query params — Kalshi signs path only (no query string)
+	if idx := strings.Index(path, "?"); idx != -1 {
+		path = path[:idx]
+	}
 
 	// Kalshi signs: timestamp_ms + METHOD + path (NO body)
 	signature, err := c.signer.Sign(timestamp, req.Method, path)
