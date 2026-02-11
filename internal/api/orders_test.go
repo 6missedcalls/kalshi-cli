@@ -272,7 +272,7 @@ func TestDecreaseOrder(t *testing.T) {
 		resp := models.OrderResponse{
 			Order: models.Order{
 				OrderID:           "order-to-decrease",
-				RemainingQuantity: 5,
+				RemainingCount: 5,
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -286,8 +286,8 @@ func TestDecreaseOrder(t *testing.T) {
 		t.Fatalf("DecreaseOrder failed: %v", err)
 	}
 
-	if result.Order.RemainingQuantity != 5 {
-		t.Errorf("expected remaining quantity 5, got %d", result.Order.RemainingQuantity)
+	if result.Order.RemainingCount != 5 {
+		t.Errorf("expected remaining quantity 5, got %d", result.Order.RemainingCount)
 	}
 }
 

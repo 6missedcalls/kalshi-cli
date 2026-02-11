@@ -81,14 +81,20 @@ var (
 )
 
 func FormatPrice(cents int) string {
-	dollars := float64(cents) / 100.0
-	return fmt.Sprintf("$%.2f", dollars)
+	if cents < 0 {
+		return fmt.Sprintf("-$%.2f", float64(-cents)/100.0)
+	}
+	return fmt.Sprintf("$%.2f", float64(cents)/100.0)
 }
 
 func FormatPriceStyled(cents int, positive bool) string {
-	dollars := float64(cents) / 100.0
+	absCents := cents
+	if absCents < 0 {
+		absCents = -absCents
+	}
+	dollars := float64(absCents) / 100.0
 	style := PriceDownStyle
-	prefix := ""
+	prefix := "-"
 	if positive {
 		style = PriceUpStyle
 		prefix = "+"

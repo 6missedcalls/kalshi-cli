@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/6missedcalls/kalshi-cli/pkg/models"
 )
@@ -17,17 +16,17 @@ import (
 func TestCommunicationsPathsAudit(t *testing.T) {
 	// Define expected paths according to Kalshi API documentation
 	expectedPaths := map[string]string{
-		"GetRFQs":       "/trade-api/v2/communications/rfqs",
-		"GetRFQ":        "/trade-api/v2/communications/rfqs/rfq-123",
-		"CreateRFQ":     "/trade-api/v2/communications/rfqs",
-		"DeleteRFQ":     "/trade-api/v2/communications/rfqs/rfq-123",
-		"GetQuotes":     "/trade-api/v2/communications/quotes",
-		"GetQuote":      "/trade-api/v2/communications/quotes/quote-456",
-		"CreateQuote":   "/trade-api/v2/communications/quotes",
-		"AcceptQuote":   "/trade-api/v2/communications/quotes/quote-456/accept",
-		"ConfirmQuote":  "/trade-api/v2/communications/quotes/quote-456/confirm",
-		"DeleteQuote":   "/trade-api/v2/communications/quotes/quote-456",
-		"GetCommID":     "/trade-api/v2/communications/id",
+		"GetRFQs":      "/trade-api/v2/communications/rfqs",
+		"GetRFQ":       "/trade-api/v2/communications/rfqs/rfq-123",
+		"CreateRFQ":    "/trade-api/v2/communications/rfqs",
+		"DeleteRFQ":    "/trade-api/v2/communications/rfqs/rfq-123",
+		"GetQuotes":    "/trade-api/v2/communications/quotes",
+		"GetQuote":     "/trade-api/v2/communications/quotes/quote-456",
+		"CreateQuote":  "/trade-api/v2/communications/quotes",
+		"AcceptQuote":  "/trade-api/v2/communications/quotes/quote-456/accept",
+		"ConfirmQuote": "/trade-api/v2/communications/quotes/quote-456/confirm",
+		"DeleteQuote":  "/trade-api/v2/communications/quotes/quote-456",
+		"GetCommID":    "/trade-api/v2/communications/id",
 	}
 
 	t.Run("GetRFQs uses correct path", func(t *testing.T) {
@@ -48,13 +47,11 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 
 	t.Run("GetRFQ uses correct path", func(t *testing.T) {
 		var actualPath string
-		now := time.Now().UTC()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actualPath = r.URL.Path
 			json.NewEncoder(w).Encode(models.RFQResponse{RFQ: models.RFQ{
-				RFQID:       "rfq-123",
-				CreatedTime: now,
-				ExpiresTime: now.Add(time.Hour),
+				ID:        "rfq-123",
+				CreatedTs: "2024-01-15T12:00:00Z",
 			}})
 		}))
 		defer server.Close()
@@ -69,22 +66,19 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 
 	t.Run("CreateRFQ uses correct path", func(t *testing.T) {
 		var actualPath string
-		now := time.Now().UTC()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actualPath = r.URL.Path
 			json.NewEncoder(w).Encode(models.RFQResponse{RFQ: models.RFQ{
-				RFQID:       "new-rfq",
-				CreatedTime: now,
-				ExpiresTime: now.Add(time.Hour),
+				ID:        "new-rfq",
+				CreatedTs: "2024-01-15T12:00:00Z",
 			}})
 		}))
 		defer server.Close()
 
 		client := createPathTestClient(t, server.URL)
 		client.CreateRFQ(context.Background(), models.CreateRFQRequest{
-			Ticker:   "TEST",
-			Side:     "yes",
-			Quantity: 100,
+			MarketTicker: "TEST",
+			Contracts:    100,
 		})
 
 		if actualPath != expectedPaths["CreateRFQ"] {
@@ -126,13 +120,11 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 
 	t.Run("GetQuote uses correct path", func(t *testing.T) {
 		var actualPath string
-		now := time.Now().UTC()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actualPath = r.URL.Path
 			json.NewEncoder(w).Encode(models.QuoteResponse{Quote: models.Quote{
-				QuoteID:     "quote-456",
-				CreatedTime: now,
-				ExpiresTime: now.Add(time.Minute * 5),
+				ID:        "quote-456",
+				CreatedTs: "2024-01-15T12:00:00Z",
 			}})
 		}))
 		defer server.Close()
@@ -147,21 +139,19 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 
 	t.Run("CreateQuote uses correct path", func(t *testing.T) {
 		var actualPath string
-		now := time.Now().UTC()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actualPath = r.URL.Path
 			json.NewEncoder(w).Encode(models.QuoteResponse{Quote: models.Quote{
-				QuoteID:     "new-quote",
-				CreatedTime: now,
-				ExpiresTime: now.Add(time.Minute * 5),
+				ID:        "new-quote",
+				CreatedTs: "2024-01-15T12:00:00Z",
 			}})
 		}))
 		defer server.Close()
 
 		client := createPathTestClient(t, server.URL)
 		client.CreateQuote(context.Background(), models.CreateQuoteRequest{
-			RFQID: "rfq-123",
-			Price: 50,
+			RFQID:  "rfq-123",
+			YesBid: 50,
 		})
 
 		if actualPath != expectedPaths["CreateQuote"] {
@@ -171,13 +161,11 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 
 	t.Run("AcceptQuote uses correct path", func(t *testing.T) {
 		var actualPath string
-		now := time.Now().UTC()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actualPath = r.URL.Path
 			json.NewEncoder(w).Encode(models.QuoteResponse{Quote: models.Quote{
-				QuoteID:     "quote-456",
-				Status:      "accepted",
-				CreatedTime: now,
+				ID:     "quote-456",
+				Status: "accepted",
 			}})
 		}))
 		defer server.Close()
@@ -192,13 +180,11 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 
 	t.Run("ConfirmQuote uses correct path", func(t *testing.T) {
 		var actualPath string
-		now := time.Now().UTC()
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			actualPath = r.URL.Path
 			json.NewEncoder(w).Encode(models.QuoteResponse{Quote: models.Quote{
-				QuoteID:     "quote-456",
-				Status:      "confirmed",
-				CreatedTime: now,
+				ID:     "quote-456",
+				Status: "confirmed",
 			}})
 		}))
 		defer server.Close()
@@ -245,7 +231,6 @@ func TestCommunicationsPathsAudit(t *testing.T) {
 }
 
 func TestConfirmQuoteExists(t *testing.T) {
-	now := time.Now().UTC()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
@@ -253,9 +238,8 @@ func TestConfirmQuoteExists(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(models.QuoteResponse{Quote: models.Quote{
-			QuoteID:     "quote-789",
-			Status:      "confirmed",
-			CreatedTime: now,
+			ID:     "quote-789",
+			Status: "confirmed",
 		}})
 	}))
 	defer server.Close()

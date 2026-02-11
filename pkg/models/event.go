@@ -4,17 +4,17 @@ import "time"
 
 // Event represents a Kalshi event
 type Event struct {
-	EventTicker     string    `json:"event_ticker"`
-	SeriesTicker    string    `json:"series_ticker"`
-	Title           string    `json:"title"`
-	Subtitle        string    `json:"subtitle"`
-	Category        string    `json:"category"`
-	Status          string    `json:"status"`
-	Markets         []string  `json:"markets"`
-	MutuallyExclusive bool    `json:"mutually_exclusive"`
-	StrikeDate      time.Time `json:"strike_date"`
-	ExpectedExpiration time.Time `json:"expected_expiration"`
-	CreatedTime     time.Time `json:"created_time"`
+	EventTicker          string     `json:"event_ticker"`
+	SeriesTicker         string     `json:"series_ticker"`
+	Title                string     `json:"title"`
+	SubTitle             string     `json:"sub_title"`
+	Category             string     `json:"category"`
+	MutuallyExclusive    bool       `json:"mutually_exclusive"`
+	CollateralReturnType string     `json:"collateral_return_type"`
+	StrikeDate           *time.Time `json:"strike_date,omitempty"`
+	StrikePeriod         string     `json:"strike_period,omitempty"`
+	AvailableOnBrokers   bool       `json:"available_on_brokers"`
+	Markets              []string   `json:"markets,omitempty"`
 }
 
 // EventResponse is the API response for a single event
@@ -56,12 +56,12 @@ type ForecastPercentileHistoryResponse struct {
 
 // MultivariateEvent represents a multivariate event
 type MultivariateEvent struct {
-	Ticker          string   `json:"ticker"`
-	Title           string   `json:"title"`
-	Description     string   `json:"description"`
-	Status          string   `json:"status"`
-	LookupTable     []string `json:"lookup_table"`
-	LookupType      string   `json:"lookup_type"`
+	Ticker      string   `json:"ticker"`
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	LookupTable []string `json:"lookup_table"`
+	LookupType  string   `json:"lookup_type"`
 }
 
 // MultivariateEventsResponse is the API response for multivariate events

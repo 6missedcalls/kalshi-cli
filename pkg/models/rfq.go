@@ -1,16 +1,21 @@
 package models
 
-import "time"
-
 // RFQ represents a Request for Quote
 type RFQ struct {
-	RFQID       string    `json:"rfq_id"`
-	Ticker      string    `json:"ticker"`
-	Side        string    `json:"side"`
-	Quantity    int       `json:"quantity"`
-	Status      string    `json:"status"`
-	CreatedTime time.Time `json:"created_time"`
-	ExpiresTime time.Time `json:"expires_time"`
+	ID                  string `json:"id"`
+	CreatorID           string `json:"creator_id"`
+	MarketTicker        string `json:"market_ticker"`
+	Contracts           int    `json:"contracts"`
+	ContractsFP         string `json:"contracts_fp"`
+	TargetCostDollars   string `json:"target_cost_dollars"`
+	Status              string `json:"status"`
+	CreatedTs           string `json:"created_ts"`
+	UpdatedTs           string `json:"updated_ts"`
+	MveCollectionTicker string `json:"mve_collection_ticker,omitempty"`
+	RestRemainder       bool   `json:"rest_remainder"`
+	CancellationReason  string `json:"cancellation_reason,omitempty"`
+	CreatorUserID       string `json:"creator_user_id"`
+	CancelledTs         string `json:"cancelled_ts,omitempty"`
 }
 
 // RFQsResponse is the API response for RFQs
@@ -26,22 +31,34 @@ type RFQResponse struct {
 
 // CreateRFQRequest is the request to create an RFQ
 type CreateRFQRequest struct {
-	Ticker   string `json:"ticker"`
-	Side     string `json:"side"`
-	Quantity int    `json:"quantity"`
+	MarketTicker string `json:"market_ticker"`
+	Contracts    int    `json:"contracts"`
 }
 
 // Quote represents a quote on an RFQ
 type Quote struct {
-	QuoteID     string    `json:"quote_id"`
-	RFQID       string    `json:"rfq_id"`
-	Ticker      string    `json:"ticker"`
-	Side        string    `json:"side"`
-	Price       int       `json:"price"`
-	Quantity    int       `json:"quantity"`
-	Status      string    `json:"status"`
-	CreatedTime time.Time `json:"created_time"`
-	ExpiresTime time.Time `json:"expires_time"`
+	ID                 string `json:"id"`
+	RFQID              string `json:"rfq_id"`
+	CreatorID          string `json:"creator_id"`
+	RFQCreatorID       string `json:"rfq_creator_id"`
+	MarketTicker       string `json:"market_ticker"`
+	Contracts          int    `json:"contracts"`
+	ContractsFP        string `json:"contracts_fp"`
+	YesBid             int    `json:"yes_bid"`
+	NoBid              int    `json:"no_bid"`
+	YesBidDollars      string `json:"yes_bid_dollars"`
+	NoBidDollars       string `json:"no_bid_dollars"`
+	CreatedTs          string `json:"created_ts"`
+	UpdatedTs          string `json:"updated_ts"`
+	Status             string `json:"status"`
+	AcceptedSide       string `json:"accepted_side,omitempty"`
+	AcceptedTs         string `json:"accepted_ts,omitempty"`
+	ConfirmedTs        string `json:"confirmed_ts,omitempty"`
+	ExecutedTs         string `json:"executed_ts,omitempty"`
+	CancelledTs        string `json:"cancelled_ts,omitempty"`
+	RestRemainder      bool   `json:"rest_remainder"`
+	CancellationReason string `json:"cancellation_reason,omitempty"`
+	CreatorUserID      string `json:"creator_user_id"`
 }
 
 // QuotesResponse is the API response for quotes
@@ -57,9 +74,9 @@ type QuoteResponse struct {
 
 // CreateQuoteRequest is the request to create a quote
 type CreateQuoteRequest struct {
-	RFQID    string `json:"rfq_id"`
-	Price    int    `json:"price"`
-	Quantity int    `json:"quantity,omitempty"`
+	RFQID  string `json:"rfq_id"`
+	YesBid int    `json:"yes_bid"`
+	NoBid  int    `json:"no_bid,omitempty"`
 }
 
 // CommunicationsID represents the communications ID

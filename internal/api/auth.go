@@ -4,12 +4,12 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 )
 
@@ -72,12 +72,20 @@ func (s *Signer) APIKeyID() string {
 	return s.apiKeyID
 }
 
-// Sign generates a signature for the given request parameters
-func (s *Signer) Sign(timestamp time.Time, method, path, body string) (string, error) {
-	message := BuildAuthMessage(timestamp, method, path, body)
+// Sign generates a signature for the given request parameters.
+// Uses RSA-PSS with SHA-256 and millisecond Unix timestamp, matching Kalshi's API spec.
+func (s *Signer) Sign(timestamp time.Time, method, path string) (string, error) {
+	message := BuildAuthMessage(timestamp, method, path)
 
-	hash := sha256.Sum256([]byte(message))
-	signature, err := rsa.SignPKCS1v15(rand.Reader, s.privateKey, crypto.SHA256, hash[:])
+	// RSA-PSS signature (NOT PKCS1v15) — required by Kalshi API
+	msgBytes := []byte(message)
+	h := crypto.SHA256.New()
+	h.Write(msgBytes)
+	hashed := h.Sum(nil)
+
+	signature, err := rsa.SignPSS(rand.Reader, s.privateKey, crypto.SHA256, hashed, &rsa.PSSOptions{
+		SaltLength: rsa.PSSSaltLengthEqualsHash,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to sign message: %w", err)
 	}
@@ -85,21 +93,16 @@ func (s *Signer) Sign(timestamp time.Time, method, path, body string) (string, e
 	return base64.StdEncoding.EncodeToString(signature), nil
 }
 
-// BuildAuthMessage constructs the message to be signed
-// Format: timestamp + method + path + body
-func BuildAuthMessage(timestamp time.Time, method, path, body string) string {
-	ts := timestamp.UTC().Format("2006-01-02T15:04:05Z")
-	return ts + method + path + body
+// BuildAuthMessage constructs the message to be signed.
+// Format: timestamp_ms + METHOD + /trade-api/v2/path (NO body)
+func BuildAuthMessage(timestamp time.Time, method, path string) string {
+	ts := strconv.FormatInt(timestamp.UnixMilli(), 10)
+	return ts + method + path
 }
 
-// AuthHeader returns the Authorization header value
-func (s *Signer) AuthHeader(signature string) string {
-	return fmt.Sprintf("KALSHI-API-KEY %s:%s", s.apiKeyID, signature)
-}
-
-// TimestampHeader returns the timestamp in the format required by Kalshi
+// TimestampHeader returns the timestamp as milliseconds since epoch (Kalshi format)
 func TimestampHeader(t time.Time) string {
-	return t.UTC().Format("2006-01-02T15:04:05Z")
+	return strconv.FormatInt(t.UnixMilli(), 10)
 }
 
 // GenerateKeyPair generates a new RSA key pair for API authentication

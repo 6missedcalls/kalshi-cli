@@ -128,8 +128,8 @@ func runExchangeSchedule(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var schedule models.ExchangeScheduleResponse
-	if err := client.GetExchangeSchedule(ctx, &schedule); err != nil {
+	schedule, err := client.GetExchangeSchedule(ctx)
+	if err != nil {
 		return fmt.Errorf("failed to get exchange schedule: %w", err)
 	}
 
@@ -143,40 +143,64 @@ func runExchangeSchedule(cmd *cobra.Command, args []string) error {
 	)
 }
 
-func renderScheduleTable(schedule models.ExchangeScheduleResponse) {
-	if len(schedule.Schedule.ScheduleEntries) == 0 {
-		fmt.Println(ui.MutedStyle.Render("No schedule entries found."))
-		return
-	}
-
-	headers := []string{"Start Time", "End Time", "Maintenance"}
-	var rows [][]string
-
-	for _, entry := range schedule.Schedule.ScheduleEntries {
-		maintenance := "No"
-		if entry.Maintenance {
-			maintenance = ui.WarningStyle.Render("Yes")
+func renderScheduleTable(schedule *models.ExchangeScheduleResponse) {
+	if len(schedule.Schedule.StandardHours) > 0 {
+		fmt.Println(ui.HeaderStyle.Render("Standard Hours"))
+		for _, week := range schedule.Schedule.StandardHours {
+			fmt.Printf("  Period: %s to %s\n", week.StartTime, week.EndTime)
+			showDay("Monday", week.Monday)
+			showDay("Tuesday", week.Tuesday)
+			showDay("Wednesday", week.Wednesday)
+			showDay("Thursday", week.Thursday)
+			showDay("Friday", week.Friday)
+			showDay("Saturday", week.Saturday)
+			showDay("Sunday", week.Sunday)
 		}
-
-		rows = append(rows, []string{
-			formatTime(entry.StartTime),
-			formatTime(entry.EndTime),
-			maintenance,
-		})
 	}
 
-	ui.RenderTable(headers, rows)
+	if len(schedule.Schedule.MaintenanceWindows) > 0 {
+		fmt.Println(ui.HeaderStyle.Render("Maintenance Windows"))
+		for _, mw := range schedule.Schedule.MaintenanceWindows {
+			fmt.Printf("  %s to %s\n", mw.StartDatetime, mw.EndDatetime)
+		}
+	}
+
+	if len(schedule.Schedule.StandardHours) == 0 && len(schedule.Schedule.MaintenanceWindows) == 0 {
+		fmt.Println(ui.MutedStyle.Render("No schedule entries found."))
+	}
 }
 
-func renderSchedulePlain(schedule models.ExchangeScheduleResponse) {
-	for i, entry := range schedule.Schedule.ScheduleEntries {
-		maintenance := "no"
-		if entry.Maintenance {
-			maintenance = "yes"
-		}
-		fmt.Printf("entry_%d_start=%s\n", i, entry.StartTime.Format(time.RFC3339))
-		fmt.Printf("entry_%d_end=%s\n", i, entry.EndTime.Format(time.RFC3339))
-		fmt.Printf("entry_%d_maintenance=%s\n", i, maintenance)
+func showDay(name string, slots []models.DailySchedule) {
+	if len(slots) == 0 {
+		return
+	}
+	for _, s := range slots {
+		fmt.Printf("    %s: %s - %s\n", name, s.OpenTime, s.CloseTime)
+	}
+}
+
+func renderSchedulePlain(schedule *models.ExchangeScheduleResponse) {
+	for i, week := range schedule.Schedule.StandardHours {
+		fmt.Printf("week_%d_start=%s\n", i, week.StartTime)
+		fmt.Printf("week_%d_end=%s\n", i, week.EndTime)
+		printDayPlain(i, "monday", week.Monday)
+		printDayPlain(i, "tuesday", week.Tuesday)
+		printDayPlain(i, "wednesday", week.Wednesday)
+		printDayPlain(i, "thursday", week.Thursday)
+		printDayPlain(i, "friday", week.Friday)
+		printDayPlain(i, "saturday", week.Saturday)
+		printDayPlain(i, "sunday", week.Sunday)
+	}
+	for i, mw := range schedule.Schedule.MaintenanceWindows {
+		fmt.Printf("maintenance_%d_start=%s\n", i, mw.StartDatetime)
+		fmt.Printf("maintenance_%d_end=%s\n", i, mw.EndDatetime)
+	}
+}
+
+func printDayPlain(weekIdx int, day string, slots []models.DailySchedule) {
+	for j, s := range slots {
+		fmt.Printf("week_%d_%s_%d_open=%s\n", weekIdx, day, j, s.OpenTime)
+		fmt.Printf("week_%d_%s_%d_close=%s\n", weekIdx, day, j, s.CloseTime)
 	}
 }
 
@@ -196,8 +220,8 @@ func runExchangeAnnouncements(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	var announcements models.AnnouncementsResponse
-	if err := client.GetAnnouncements(ctx, &announcements); err != nil {
+	announcements, err := client.GetAnnouncements(ctx)
+	if err != nil {
 		return fmt.Errorf("failed to get announcements: %w", err)
 	}
 
@@ -211,7 +235,7 @@ func runExchangeAnnouncements(cmd *cobra.Command, args []string) error {
 	)
 }
 
-func renderAnnouncementsTable(announcements models.AnnouncementsResponse) {
+func renderAnnouncementsTable(announcements *models.AnnouncementsResponse) {
 	if len(announcements.Announcements) == 0 {
 		fmt.Println(ui.MutedStyle.Render("No announcements found."))
 		return
@@ -234,7 +258,7 @@ func renderAnnouncementsTable(announcements models.AnnouncementsResponse) {
 	ui.RenderTable(headers, rows)
 }
 
-func renderAnnouncementsPlain(announcements models.AnnouncementsResponse) {
+func renderAnnouncementsPlain(announcements *models.AnnouncementsResponse) {
 	for i, ann := range announcements.Announcements {
 		fmt.Printf("announcement_%d_id=%s\n", i, ann.ID)
 		fmt.Printf("announcement_%d_title=%s\n", i, ann.Title)
@@ -258,8 +282,9 @@ func formatAnnouncementStatus(status string) string {
 }
 
 func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }

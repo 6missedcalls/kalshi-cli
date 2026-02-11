@@ -23,7 +23,8 @@ const (
 	maxRetryDelay     = 10 * time.Second
 	retryMultiplier   = 2.0
 	headerTimestamp   = "KALSHI-ACCESS-TIMESTAMP"
-	headerAuth        = "Authorization"
+	headerAccessKey   = "KALSHI-ACCESS-KEY"
+	headerSignature   = "KALSHI-ACCESS-SIGNATURE"
 )
 
 // Client handles HTTP requests to the Kalshi API
@@ -138,30 +139,15 @@ func (c *Client) signRequest(client *resty.Client, req *resty.Request) error {
 	timestamp := time.Now().UTC()
 	path := req.URL
 
-	// Get the body as string for signing
-	var body string
-	if req.Body != nil {
-		switch v := req.Body.(type) {
-		case string:
-			body = v
-		case []byte:
-			body = string(v)
-		default:
-			bodyBytes, err := json.Marshal(req.Body)
-			if err != nil {
-				return fmt.Errorf("failed to marshal request body: %w", err)
-			}
-			body = string(bodyBytes)
-		}
-	}
-
-	signature, err := c.signer.Sign(timestamp, req.Method, path, body)
+	// Kalshi signs: timestamp_ms + METHOD + path (NO body)
+	signature, err := c.signer.Sign(timestamp, req.Method, path)
 	if err != nil {
 		return fmt.Errorf("failed to sign request: %w", err)
 	}
 
 	req.SetHeader(headerTimestamp, TimestampHeader(timestamp))
-	req.SetHeader(headerAuth, c.signer.AuthHeader(signature))
+	req.SetHeader(headerAccessKey, c.signer.APIKeyID())
+	req.SetHeader(headerSignature, signature)
 
 	return nil
 }
@@ -391,7 +377,7 @@ type ExchangeStatusResponse struct {
 // ListAPIKeys returns all API keys for the authenticated user
 func (c *Client) ListAPIKeys(ctx context.Context) ([]APIKey, error) {
 	var result apiKeysResponse
-	if err := c.DoRequest(ctx, "GET", "/api-keys", nil, &result); err != nil {
+	if err := c.DoRequest(ctx, "GET", TradeAPIPrefix+"/api-keys", nil, &result); err != nil {
 		return nil, err
 	}
 	return result.APIKeys, nil
@@ -424,7 +410,7 @@ type CreateAPIKeyResponse struct {
 // CreateAPIKey creates a new API key
 func (c *Client) CreateAPIKey(ctx context.Context, req CreateAPIKeyRequest) (*CreateAPIKeyResponse, error) {
 	var result CreateAPIKeyResponse
-	if err := c.DoRequest(ctx, "POST", "/api-keys", req, &result); err != nil {
+	if err := c.DoRequest(ctx, "POST", TradeAPIPrefix+"/api-keys", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -432,7 +418,7 @@ func (c *Client) CreateAPIKey(ctx context.Context, req CreateAPIKeyRequest) (*Cr
 
 // DeleteAPIKey deletes an API key by ID
 func (c *Client) DeleteAPIKey(ctx context.Context, keyID string) error {
-	return c.DoRequest(ctx, "DELETE", "/api-keys/"+keyID, nil, nil)
+	return c.DoRequest(ctx, "DELETE", TradeAPIPrefix+"/api-keys/"+keyID, nil, nil)
 }
 
 // APILimitsResponse represents the API rate limits for the account
@@ -444,7 +430,7 @@ type APILimitsResponse struct {
 // GetAPILimits retrieves the API tier limits for the authenticated user
 func (c *Client) GetAPILimits(ctx context.Context) (*APILimitsResponse, error) {
 	var result APILimitsResponse
-	if err := c.DoRequest(ctx, "GET", "/account/api-limits", nil, &result); err != nil {
+	if err := c.DoRequest(ctx, "GET", TradeAPIPrefix+"/account/api-limits", nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -464,7 +450,7 @@ type GenerateAPIKeyResponse struct {
 // GenerateAPIKey generates a new API key pair (Kalshi generates the key pair)
 func (c *Client) GenerateAPIKey(ctx context.Context, req GenerateAPIKeyRequest) (*GenerateAPIKeyResponse, error) {
 	var result GenerateAPIKeyResponse
-	if err := c.DoRequest(ctx, "POST", "/api-keys/generate", req, &result); err != nil {
+	if err := c.DoRequest(ctx, "POST", TradeAPIPrefix+"/api-keys/generate", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -484,7 +470,7 @@ type CreateAPIKeyWithPublicKeyResponse struct {
 // CreateAPIKeyWithPublicKey creates a new API key using a user-provided RSA public key
 func (c *Client) CreateAPIKeyWithPublicKey(ctx context.Context, req CreateAPIKeyWithPublicKeyRequest) (*CreateAPIKeyWithPublicKeyResponse, error) {
 	var result CreateAPIKeyWithPublicKeyResponse
-	if err := c.DoRequest(ctx, "POST", "/api-keys", req, &result); err != nil {
+	if err := c.DoRequest(ctx, "POST", TradeAPIPrefix+"/api-keys", req, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

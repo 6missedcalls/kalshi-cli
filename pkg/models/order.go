@@ -22,10 +22,10 @@ const (
 type OrderStatus string
 
 const (
-	OrderStatusResting   OrderStatus = "resting"
-	OrderStatusCanceled  OrderStatus = "canceled"
-	OrderStatusExecuted  OrderStatus = "executed"
-	OrderStatusPending   OrderStatus = "pending"
+	OrderStatusResting  OrderStatus = "resting"
+	OrderStatusCanceled OrderStatus = "canceled"
+	OrderStatusExecuted OrderStatus = "executed"
+	OrderStatusPending  OrderStatus = "pending"
 )
 
 // OrderAction represents order action
@@ -38,32 +38,33 @@ const (
 
 // Order represents a trading order
 type Order struct {
-	OrderID              string      `json:"order_id"`
-	UserID               string      `json:"user_id"`
-	Ticker               string      `json:"ticker"`
-	Status               OrderStatus `json:"status"`
-	YesPrice             int         `json:"yes_price"`
-	NoPrice              int         `json:"no_price"`
-	Type                 OrderType   `json:"type"`
-	Side                 OrderSide   `json:"side"`
-	Action               OrderAction `json:"action"`
-	InitialQuantity      int         `json:"initial_quantity"`
-	RemainingQuantity    int         `json:"remaining_quantity"`
-	FilledQuantity       int         `json:"filled_quantity"`
-	AverageFillPrice     int         `json:"average_fill_price"`
-	ExpirationTime       *time.Time  `json:"expiration_time,omitempty"`
-	CreatedTime          time.Time   `json:"created_time"`
-	LastUpdateTime       time.Time   `json:"last_update_time"`
-	OrderGroupID         string      `json:"order_group_id,omitempty"`
-	DecreaseQty          int         `json:"decrease_quantity,omitempty"`
-	TakerFillCount       int         `json:"taker_fill_count"`
-	TakerFillCost        int         `json:"taker_fill_cost"`
-	TakerFees            int         `json:"taker_fees"`
-	MakerFillCount       int         `json:"maker_fill_count"`
-	MakerFillCost        int         `json:"maker_fill_cost"`
-	MakerFees            int         `json:"maker_fees"`
-	ClientOrderID        string      `json:"client_order_id,omitempty"`
-	SubaccountID         int         `json:"subaccount_id,omitempty"`
+	OrderID                 string      `json:"order_id"`
+	UserID                  string      `json:"user_id"`
+	Ticker                  string      `json:"ticker"`
+	Status                  OrderStatus `json:"status"`
+	YesPrice                int         `json:"yes_price"`
+	NoPrice                 int         `json:"no_price"`
+	Type                    OrderType   `json:"type"`
+	Side                    OrderSide   `json:"side"`
+	Action                  OrderAction `json:"action"`
+	InitialCount            int         `json:"initial_count"`
+	RemainingCount          int         `json:"remaining_count"`
+	FillCount               int         `json:"fill_count"`
+	QueuePosition           int         `json:"queue_position"`
+	CancelOrderOnPause      bool        `json:"cancel_order_on_pause"`
+	ExpirationTime          *time.Time  `json:"expiration_time,omitempty"`
+	CreatedTime             time.Time   `json:"created_time"`
+	LastUpdateTime          time.Time   `json:"last_update_time"`
+	OrderGroupID            string      `json:"order_group_id,omitempty"`
+	TakerFillCount          int         `json:"taker_fill_count"`
+	TakerFillCost           int         `json:"taker_fill_cost"`
+	TakerFees               int         `json:"taker_fees"`
+	MakerFillCount          int         `json:"maker_fill_count"`
+	MakerFillCost           int         `json:"maker_fill_cost"`
+	MakerFees               int         `json:"maker_fees"`
+	ClientOrderID           string      `json:"client_order_id,omitempty"`
+	SubaccountNumber        int         `json:"subaccount_number,omitempty"`
+	SelfTradePreventionType string      `json:"self_trade_prevention_type,omitempty"`
 }
 
 // OrderResponse is the API response for a single order
@@ -79,19 +80,19 @@ type OrdersResponse struct {
 
 // CreateOrderRequest is the request to create an order
 type CreateOrderRequest struct {
-	Ticker        string      `json:"ticker"`
-	Side          OrderSide   `json:"side"`
-	Action        OrderAction `json:"action"`
-	Type          OrderType   `json:"type"`
-	Count         int         `json:"count"`
-	YesPrice      int         `json:"yes_price,omitempty"`
-	NoPrice       int         `json:"no_price,omitempty"`
-	ExpirationTs  int64       `json:"expiration_ts,omitempty"`
-	ClientOrderID string      `json:"client_order_id,omitempty"`
-	OrderGroupID  string      `json:"order_group_id,omitempty"`
-	SubaccountID  int         `json:"subaccount_id,omitempty"`
-	SellPositionFloor int     `json:"sell_position_floor,omitempty"`
-	BuyMaxCost    int         `json:"buy_max_cost,omitempty"`
+	Ticker            string      `json:"ticker"`
+	Side              OrderSide   `json:"side"`
+	Action            OrderAction `json:"action"`
+	Type              OrderType   `json:"type"`
+	Count             int         `json:"count"`
+	YesPrice          int         `json:"yes_price,omitempty"`
+	NoPrice           int         `json:"no_price,omitempty"`
+	ExpirationTs      int64       `json:"expiration_ts,omitempty"`
+	ClientOrderID     string      `json:"client_order_id,omitempty"`
+	OrderGroupID      string      `json:"order_group_id,omitempty"`
+	SubaccountID      int         `json:"subaccount_id,omitempty"`
+	SellPositionFloor int         `json:"sell_position_floor,omitempty"`
+	BuyMaxCost        int         `json:"buy_max_cost,omitempty"`
 }
 
 // CreateOrderResponse is the response from creating an order

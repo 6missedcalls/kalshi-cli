@@ -17,10 +17,11 @@ type ListEventsParams struct {
 
 // CandlesticksParams contains parameters for getting candlesticks
 type CandlesticksParams struct {
-	Ticker    string
-	Period    string
-	StartTime *time.Time
-	EndTime   *time.Time
+	SeriesTicker string
+	Ticker       string
+	Period       string
+	StartTime    *time.Time
+	EndTime      *time.Time
 }
 
 // ListMultivariateParams contains parameters for listing multivariate events
@@ -78,7 +79,7 @@ func (c *Client) GetEventCandlesticks(ctx context.Context, params CandlesticksPa
 	queryParams := make(map[string]string)
 
 	if params.Period != "" {
-		queryParams["period"] = params.Period
+		queryParams["period_interval"] = periodToInterval(params.Period)
 	}
 	if params.StartTime != nil {
 		queryParams["start_ts"] = strconv.FormatInt(params.StartTime.Unix(), 10)
@@ -87,7 +88,7 @@ func (c *Client) GetEventCandlesticks(ctx context.Context, params CandlesticksPa
 		queryParams["end_ts"] = strconv.FormatInt(params.EndTime.Unix(), 10)
 	}
 
-	path := TradeAPIPrefix + "/events/" + params.Ticker + "/candlesticks" + BuildQueryString(queryParams)
+	path := TradeAPIPrefix + "/series/" + params.SeriesTicker + "/events/" + params.Ticker + "/candlesticks" + BuildQueryString(queryParams)
 
 	var resp models.CandlesticksResponse
 	if err := c.DoRequest(ctx, "GET", path, nil, &resp); err != nil {

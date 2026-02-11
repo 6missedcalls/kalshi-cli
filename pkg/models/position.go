@@ -2,51 +2,53 @@ package models
 
 import "time"
 
-// Position represents a market position
-type Position struct {
-	Ticker                string    `json:"ticker"`
-	EventTicker           string    `json:"event_ticker"`
-	EventExposure         int       `json:"event_exposure"`
-	Exposure              int       `json:"exposure"`
-	RestingBuyExposure    int       `json:"resting_buy_exposure"`
-	RestingSellExposure   int       `json:"resting_sell_exposure"`
-	MarketExposure        int       `json:"market_exposure"`
-	Position              int       `json:"position"`
-	TotalCost             int       `json:"total_cost"`
-	RealizedPnl           int       `json:"realized_pnl"`
-	Fees                  int       `json:"fees"`
-	SettlementValue       int       `json:"settlement_value"`
-	Direction             string    `json:"direction"`
-	TotalBought           int       `json:"total_bought"`
-	TotalSold             int       `json:"total_sold"`
-	LastUpdateTime        time.Time `json:"last_update_time"`
+// MarketPosition represents a market position from the API
+type MarketPosition struct {
+	Ticker                string `json:"ticker"`
+	TotalTraded           int    `json:"total_traded"`
+	TotalTradedDollars    string `json:"total_traded_dollars"`
+	Position              int    `json:"position"`
+	PositionFP            string `json:"position_fp"`
+	MarketExposure        int    `json:"market_exposure"`
+	MarketExposureDollars string `json:"market_exposure_dollars"`
+	RealizedPnl           int    `json:"realized_pnl"`
+	RealizedPnlDollars    string `json:"realized_pnl_dollars"`
+	RestingOrdersCount    int    `json:"resting_orders_count"`
+	FeesPaid              int    `json:"fees_paid"`
+	FeesPaidDollars       string `json:"fees_paid_dollars"`
+	LastUpdatedTs         string `json:"last_updated_ts"`
+}
+
+// Position is an alias for MarketPosition for backward compatibility
+type Position = MarketPosition
+
+// EventPosition represents an event-level position from the API
+type EventPosition struct {
+	EventTicker          string `json:"event_ticker"`
+	TotalCost            int    `json:"total_cost"`
+	TotalCostDollars     string `json:"total_cost_dollars"`
+	TotalCostShares      int    `json:"total_cost_shares"`
+	TotalCostSharesFP    string `json:"total_cost_shares_fp"`
+	EventExposure        int    `json:"event_exposure"`
+	EventExposureDollars string `json:"event_exposure_dollars"`
+	RealizedPnl          int    `json:"realized_pnl"`
+	RealizedPnlDollars   string `json:"realized_pnl_dollars"`
+	FeesPaid             int    `json:"fees_paid"`
+	FeesPaidDollars      string `json:"fees_paid_dollars"`
 }
 
 // PositionsResponse is the API response for positions
 type PositionsResponse struct {
-	Positions           []Position `json:"market_positions"`
-	Cursor              string     `json:"cursor"`
-	EventPositions      []Position `json:"event_positions,omitempty"`
-}
-
-// Balance represents account balance
-type Balance struct {
-	Balance             int `json:"balance"`
-	AvailableBalance    int `json:"available_balance"`
-	PortfolioValue      int `json:"portfolio_value"`
-	BonusCashBalance    int `json:"bonus_cash_balance"`
-	TotalRestingOrdersValue int `json:"total_resting_orders_value"`
-	PayoutBalance       int `json:"payout_balance"`
+	Positions      []MarketPosition `json:"market_positions"`
+	EventPositions []EventPosition  `json:"event_positions,omitempty"`
+	Cursor         string           `json:"cursor"`
 }
 
 // BalanceResponse is the API response for balance
 type BalanceResponse struct {
-	Balance                 int `json:"balance"`
-	AvailableBalance        int `json:"available_balance"`
-	PortfolioValue          int `json:"portfolio_value"`
-	BonusCashBalance        int `json:"bonus_cash_balance"`
-	TotalRestingOrdersValue int `json:"total_resting_orders_value"`
-	PayoutBalance           int `json:"payout_balance"`
+	Balance        int   `json:"balance"`
+	PortfolioValue int   `json:"portfolio_value"`
+	UpdatedTs      int64 `json:"updated_ts"`
 }
 
 // Fill represents a trade fill
@@ -72,14 +74,14 @@ type FillsResponse struct {
 
 // Settlement represents a market settlement
 type Settlement struct {
-	Ticker         string    `json:"ticker"`
-	MarketResult   string    `json:"market_result"`
-	NoTotalCost    int       `json:"no_total_cost"`
-	YesTotalCost   int       `json:"yes_total_cost"`
-	NoCount        int       `json:"no_count"`
-	YesCount       int       `json:"yes_count"`
-	Revenue        int       `json:"revenue"`
-	SettledTime    time.Time `json:"settled_time"`
+	Ticker       string    `json:"ticker"`
+	MarketResult string    `json:"market_result"`
+	NoTotalCost  int       `json:"no_total_cost"`
+	YesTotalCost int       `json:"yes_total_cost"`
+	NoCount      int       `json:"no_count"`
+	YesCount     int       `json:"yes_count"`
+	Revenue      int       `json:"revenue"`
+	SettledTime  time.Time `json:"settled_time"`
 }
 
 // SettlementsResponse is the API response for settlements
@@ -90,9 +92,9 @@ type SettlementsResponse struct {
 
 // Subaccount represents a subaccount
 type Subaccount struct {
-	SubaccountID     int    `json:"subaccount_id"`
-	Balance          int    `json:"balance"`
-	AvailableBalance int    `json:"available_balance"`
+	SubaccountID     int `json:"subaccount_id"`
+	Balance          int `json:"balance"`
+	AvailableBalance int `json:"available_balance"`
 }
 
 // SubaccountsResponse is the API response for subaccounts

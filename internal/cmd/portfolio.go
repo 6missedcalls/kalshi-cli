@@ -136,8 +136,8 @@ func runBalance(cmd *cobra.Command, args []string) error {
 func renderBalanceTable(balance *models.BalanceResponse) {
 	pairs := [][]string{
 		{ui.BoldStyle.Render("Available Balance:"), ui.FormatPrice(balance.Balance)},
-		{ui.BoldStyle.Render("Portfolio Value:"), ui.FormatPrice(0)},
-		{ui.BoldStyle.Render("Total Balance:"), ui.FormatPrice(balance.Balance)},
+		{ui.BoldStyle.Render("Portfolio Value:"), ui.FormatPrice(balance.PortfolioValue)},
+		{ui.BoldStyle.Render("Total Balance:"), ui.FormatPrice(balance.Balance + balance.PortfolioValue)},
 	}
 
 	ui.RenderKeyValue(pairs)
@@ -145,8 +145,8 @@ func renderBalanceTable(balance *models.BalanceResponse) {
 
 func renderBalancePlain(balance *models.BalanceResponse) {
 	ui.PrintPlain("Available Balance: %s", ui.FormatPrice(balance.Balance))
-	ui.PrintPlain("Portfolio Value: %s", ui.FormatPrice(0))
-	ui.PrintPlain("Total Balance: %s", ui.FormatPrice(balance.Balance))
+	ui.PrintPlain("Portfolio Value: %s", ui.FormatPrice(balance.PortfolioValue))
+	ui.PrintPlain("Total Balance: %s", ui.FormatPrice(balance.Balance+balance.PortfolioValue))
 }
 
 func runPositions(cmd *cobra.Command, args []string) error {
@@ -178,7 +178,7 @@ func runPositions(cmd *cobra.Command, args []string) error {
 	)
 }
 
-func renderPositionsTable(positions []models.Position) {
+func renderPositionsTable(positions []models.MarketPosition) {
 	headers := []string{"Market", "Position", "Avg Cost", "P&L", "Exposure"}
 	rows := make([][]string, 0, len(positions))
 
@@ -190,47 +190,44 @@ func renderPositionsTable(positions []models.Position) {
 
 		rows = append(rows, []string{
 			p.Ticker,
-			formatPosition(p.Position, p.Direction),
+			formatPosition(p.Position),
 			ui.FormatPrice(avgCost),
 			pnlStr,
-			ui.FormatPrice(p.Exposure),
+			ui.FormatPrice(p.MarketExposure),
 		})
 	}
 
 	ui.RenderTable(headers, rows)
 }
 
-func renderPositionsPlain(positions []models.Position) {
+func renderPositionsPlain(positions []models.MarketPosition) {
 	for _, p := range positions {
 		avgCost := calculateAvgCost(p)
 		ui.PrintPlain("%s\t%s\t%s\t%s\t%s",
 			p.Ticker,
-			formatPosition(p.Position, p.Direction),
+			formatPosition(p.Position),
 			ui.FormatPrice(avgCost),
 			ui.FormatPrice(p.RealizedPnl),
-			ui.FormatPrice(p.Exposure),
+			ui.FormatPrice(p.MarketExposure),
 		)
 	}
 }
 
-func calculateAvgCost(p models.Position) int {
+func calculateAvgCost(p models.MarketPosition) int {
 	if p.Position == 0 {
 		return 0
 	}
-	return p.TotalCost / abs(p.Position)
+	return p.TotalTraded / abs(p.Position)
 }
 
-func formatPosition(position int, direction string) string {
+func formatPosition(position int) string {
 	if position == 0 {
 		return "0"
 	}
-	prefix := ""
-	if direction == "yes" {
-		prefix = "+"
-	} else if direction == "no" {
-		prefix = "-"
+	if position > 0 {
+		return fmt.Sprintf("+%d", position)
 	}
-	return fmt.Sprintf("%s%d", prefix, abs(position))
+	return fmt.Sprintf("-%d", abs(position))
 }
 
 func abs(n int) int {

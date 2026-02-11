@@ -8,25 +8,27 @@ import (
 )
 
 // GetExchangeSchedule retrieves the exchange schedule
-func (c *Client) GetExchangeSchedule(ctx context.Context, result *models.ExchangeScheduleResponse) error {
+func (c *Client) GetExchangeSchedule(ctx context.Context) (*models.ExchangeScheduleResponse, error) {
 	path := TradeAPIPrefix + "/exchange/schedule"
 
-	if err := c.DoRequest(ctx, "GET", path, nil, result); err != nil {
-		return fmt.Errorf("failed to get exchange schedule: %w", err)
+	var result models.ExchangeScheduleResponse
+	if err := c.DoRequest(ctx, "GET", path, nil, &result); err != nil {
+		return nil, fmt.Errorf("failed to get exchange schedule: %w", err)
 	}
 
-	return nil
+	return &result, nil
 }
 
 // GetAnnouncements retrieves the exchange announcements
-func (c *Client) GetAnnouncements(ctx context.Context, result *models.AnnouncementsResponse) error {
+func (c *Client) GetAnnouncements(ctx context.Context) (*models.AnnouncementsResponse, error) {
 	path := TradeAPIPrefix + "/exchange/announcements"
 
-	if err := c.DoRequest(ctx, "GET", path, nil, result); err != nil {
-		return fmt.Errorf("failed to get announcements: %w", err)
+	var result models.AnnouncementsResponse
+	if err := c.DoRequest(ctx, "GET", path, nil, &result); err != nil {
+		return nil, fmt.Errorf("failed to get announcements: %w", err)
 	}
 
-	return nil
+	return &result, nil
 }
 
 // GetFeeChanges retrieves the upcoming fee changes

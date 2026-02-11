@@ -426,7 +426,7 @@ func TestGetCandlesticks(t *testing.T) {
 	}{
 		{
 			name:   "returns candlesticks successfully",
-			params: GetCandlesticksParams{Ticker: "BTC-100K", Period: "1h"},
+			params: GetCandlesticksParams{SeriesTicker: "BTC-SERIES", Ticker: "BTC-100K", Period: "1h"},
 			serverResponse: models.CandlesticksResponse{
 				Candlesticks: []models.Candlestick{
 					{Ticker: "BTC-100K", Open: 45, High: 48, Low: 44, Close: 47, Volume: 1000},
@@ -439,7 +439,7 @@ func TestGetCandlesticks(t *testing.T) {
 		},
 		{
 			name:           "handles invalid ticker",
-			params:         GetCandlesticksParams{Ticker: "INVALID", Period: "1h"},
+			params:         GetCandlesticksParams{SeriesTicker: "INVALID-SERIES", Ticker: "INVALID", Period: "1h"},
 			serverResponse: models.CandlesticksResponse{},
 			serverStatus:   http.StatusNotFound,
 			wantErr:        true,
@@ -447,10 +447,11 @@ func TestGetCandlesticks(t *testing.T) {
 		{
 			name: "returns candlesticks with time range",
 			params: GetCandlesticksParams{
-				Ticker:    "ETH-5K",
-				Period:    "1d",
-				StartTime: time.Now().Add(-24 * time.Hour).Unix(),
-				EndTime:   time.Now().Unix(),
+				SeriesTicker: "ETH-SERIES",
+				Ticker:       "ETH-5K",
+				Period:       "1d",
+				StartTime:    time.Now().Add(-24 * time.Hour).Unix(),
+				EndTime:      time.Now().Unix(),
 			},
 			serverResponse: models.CandlesticksResponse{
 				Candlesticks: []models.Candlestick{
@@ -470,7 +471,7 @@ func TestGetCandlesticks(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
-				expectedPath := TradeAPIPrefix + "/markets/" + tt.params.Ticker + "/candlesticks"
+				expectedPath := TradeAPIPrefix + "/series/" + tt.params.SeriesTicker + "/markets/" + tt.params.Ticker + "/candlesticks"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -1004,10 +1005,10 @@ func TestPeriodToInterval(t *testing.T) {
 		expected string
 	}{
 		{"1m", "1"},
-		{"5m", "5"},
-		{"15m", "15"},
+		{"5m", "5m"},
+		{"15m", "15m"},
 		{"1h", "60"},
-		{"4h", "240"},
+		{"4h", "4h"},
 		{"1d", "1440"},
 		{"unknown", "unknown"}, // passthrough for unknown periods
 	}

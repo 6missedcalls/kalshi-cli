@@ -6,22 +6,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/6missedcalls/kalshi-cli/pkg/models"
 )
 
 func TestGetRFQs(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
 	expectedRFQs := []models.RFQ{
 		{
-			RFQID:       "rfq-1",
-			Ticker:      "BTC-100K",
-			Side:        "yes",
-			Quantity:    100,
-			Status:      "active",
-			CreatedTime: now,
-			ExpiresTime: now.Add(time.Hour),
+			ID:           "rfq-1",
+			MarketTicker: "BTC-100K",
+			Contracts:    100,
+			Status:       "active",
+			CreatedTs:    "2024-01-15T12:00:00Z",
 		},
 	}
 
@@ -51,8 +47,8 @@ func TestGetRFQs(t *testing.T) {
 	if len(result.RFQs) != 1 {
 		t.Errorf("expected 1 RFQ, got %d", len(result.RFQs))
 	}
-	if result.RFQs[0].RFQID != "rfq-1" {
-		t.Errorf("expected RFQ ID 'rfq-1', got '%s'", result.RFQs[0].RFQID)
+	if result.RFQs[0].ID != "rfq-1" {
+		t.Errorf("expected RFQ ID 'rfq-1', got '%s'", result.RFQs[0].ID)
 	}
 }
 
@@ -84,15 +80,12 @@ func TestGetRFQsWithOptions(t *testing.T) {
 }
 
 func TestGetRFQ(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
 	expectedRFQ := models.RFQ{
-		RFQID:       "rfq-123",
-		Ticker:      "BTC-100K",
-		Side:        "yes",
-		Quantity:    50,
-		Status:      "active",
-		CreatedTime: now,
-		ExpiresTime: now.Add(time.Hour),
+		ID:           "rfq-123",
+		MarketTicker: "BTC-100K",
+		Contracts:    50,
+		Status:       "active",
+		CreatedTs:    "2024-01-15T12:00:00Z",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -115,14 +108,12 @@ func TestGetRFQ(t *testing.T) {
 		t.Fatalf("GetRFQ failed: %v", err)
 	}
 
-	if result.RFQ.RFQID != "rfq-123" {
-		t.Errorf("expected RFQ ID 'rfq-123', got '%s'", result.RFQ.RFQID)
+	if result.RFQ.ID != "rfq-123" {
+		t.Errorf("expected RFQ ID 'rfq-123', got '%s'", result.RFQ.ID)
 	}
 }
 
 func TestCreateRFQ(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
@@ -136,25 +127,20 @@ func TestCreateRFQ(t *testing.T) {
 			t.Fatalf("failed to decode request: %v", err)
 		}
 
-		if req.Ticker != "BTC-100K" {
-			t.Errorf("expected ticker 'BTC-100K', got '%s'", req.Ticker)
+		if req.MarketTicker != "BTC-100K" {
+			t.Errorf("expected market_ticker 'BTC-100K', got '%s'", req.MarketTicker)
 		}
-		if req.Side != "yes" {
-			t.Errorf("expected side 'yes', got '%s'", req.Side)
-		}
-		if req.Quantity != 100 {
-			t.Errorf("expected quantity 100, got %d", req.Quantity)
+		if req.Contracts != 100 {
+			t.Errorf("expected contracts 100, got %d", req.Contracts)
 		}
 
 		resp := models.RFQResponse{
 			RFQ: models.RFQ{
-				RFQID:       "new-rfq-id",
-				Ticker:      req.Ticker,
-				Side:        req.Side,
-				Quantity:    req.Quantity,
-				Status:      "active",
-				CreatedTime: now,
-				ExpiresTime: now.Add(time.Hour),
+				ID:           "new-rfq-id",
+				MarketTicker: req.MarketTicker,
+				Contracts:    req.Contracts,
+				Status:       "active",
+				CreatedTs:    "2024-01-15T12:00:00Z",
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -164,16 +150,15 @@ func TestCreateRFQ(t *testing.T) {
 
 	client := createTestClient(t, server.URL)
 	result, err := client.CreateRFQ(context.Background(), models.CreateRFQRequest{
-		Ticker:   "BTC-100K",
-		Side:     "yes",
-		Quantity: 100,
+		MarketTicker: "BTC-100K",
+		Contracts:    100,
 	})
 	if err != nil {
 		t.Fatalf("CreateRFQ failed: %v", err)
 	}
 
-	if result.RFQ.RFQID != "new-rfq-id" {
-		t.Errorf("expected RFQ ID 'new-rfq-id', got '%s'", result.RFQ.RFQID)
+	if result.RFQ.ID != "new-rfq-id" {
+		t.Errorf("expected RFQ ID 'new-rfq-id', got '%s'", result.RFQ.ID)
 	}
 }
 
@@ -198,18 +183,14 @@ func TestCancelRFQ(t *testing.T) {
 }
 
 func TestGetQuotes(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
 	expectedQuotes := []models.Quote{
 		{
-			QuoteID:     "quote-1",
-			RFQID:       "rfq-1",
-			Ticker:      "BTC-100K",
-			Side:        "yes",
-			Price:       55,
-			Quantity:    100,
-			Status:      "active",
-			CreatedTime: now,
-			ExpiresTime: now.Add(time.Minute * 5),
+			ID:        "quote-1",
+			RFQID:     "rfq-1",
+			YesBid:    55,
+			Contracts: 100,
+			Status:    "active",
+			CreatedTs: "2024-01-15T12:00:00Z",
 		},
 	}
 
@@ -239,8 +220,8 @@ func TestGetQuotes(t *testing.T) {
 	if len(result.Quotes) != 1 {
 		t.Errorf("expected 1 quote, got %d", len(result.Quotes))
 	}
-	if result.Quotes[0].QuoteID != "quote-1" {
-		t.Errorf("expected quote ID 'quote-1', got '%s'", result.Quotes[0].QuoteID)
+	if result.Quotes[0].ID != "quote-1" {
+		t.Errorf("expected quote ID 'quote-1', got '%s'", result.Quotes[0].ID)
 	}
 }
 
@@ -272,16 +253,13 @@ func TestGetQuotesWithOptions(t *testing.T) {
 }
 
 func TestGetQuote(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
 	expectedQuote := models.Quote{
-		QuoteID:     "quote-123",
-		RFQID:       "rfq-1",
-		Ticker:      "BTC-100K",
-		Price:       60,
-		Quantity:    50,
-		Status:      "active",
-		CreatedTime: now,
-		ExpiresTime: now.Add(time.Minute * 5),
+		ID:        "quote-123",
+		RFQID:     "rfq-1",
+		YesBid:    60,
+		Contracts: 50,
+		Status:    "active",
+		CreatedTs: "2024-01-15T12:00:00Z",
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -304,14 +282,12 @@ func TestGetQuote(t *testing.T) {
 		t.Fatalf("GetQuote failed: %v", err)
 	}
 
-	if result.Quote.QuoteID != "quote-123" {
-		t.Errorf("expected quote ID 'quote-123', got '%s'", result.Quote.QuoteID)
+	if result.Quote.ID != "quote-123" {
+		t.Errorf("expected quote ID 'quote-123', got '%s'", result.Quote.ID)
 	}
 }
 
 func TestCreateQuote(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
@@ -328,19 +304,18 @@ func TestCreateQuote(t *testing.T) {
 		if req.RFQID != "rfq-123" {
 			t.Errorf("expected rfq_id 'rfq-123', got '%s'", req.RFQID)
 		}
-		if req.Price != 55 {
-			t.Errorf("expected price 55, got %d", req.Price)
+		if req.YesBid != 55 {
+			t.Errorf("expected yes_bid 55, got %d", req.YesBid)
 		}
 
 		resp := models.QuoteResponse{
 			Quote: models.Quote{
-				QuoteID:     "new-quote-id",
-				RFQID:       req.RFQID,
-				Price:       req.Price,
-				Quantity:    req.Quantity,
-				Status:      "active",
-				CreatedTime: now,
-				ExpiresTime: now.Add(time.Minute * 5),
+				ID:        "new-quote-id",
+				RFQID:     req.RFQID,
+				YesBid:    req.YesBid,
+				Contracts: 100,
+				Status:    "active",
+				CreatedTs: "2024-01-15T12:00:00Z",
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -350,22 +325,19 @@ func TestCreateQuote(t *testing.T) {
 
 	client := createTestClient(t, server.URL)
 	result, err := client.CreateQuote(context.Background(), models.CreateQuoteRequest{
-		RFQID:    "rfq-123",
-		Price:    55,
-		Quantity: 100,
+		RFQID:  "rfq-123",
+		YesBid: 55,
 	})
 	if err != nil {
 		t.Fatalf("CreateQuote failed: %v", err)
 	}
 
-	if result.Quote.QuoteID != "new-quote-id" {
-		t.Errorf("expected quote ID 'new-quote-id', got '%s'", result.Quote.QuoteID)
+	if result.Quote.ID != "new-quote-id" {
+		t.Errorf("expected quote ID 'new-quote-id', got '%s'", result.Quote.ID)
 	}
 }
 
 func TestAcceptQuote(t *testing.T) {
-	now := time.Now().UTC().Truncate(time.Second)
-
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Errorf("expected POST, got %s", r.Method)
@@ -376,9 +348,8 @@ func TestAcceptQuote(t *testing.T) {
 
 		resp := models.QuoteResponse{
 			Quote: models.Quote{
-				QuoteID:     "quote-123",
-				Status:      "accepted",
-				CreatedTime: now,
+				ID:     "quote-123",
+				Status: "accepted",
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")

@@ -142,10 +142,11 @@ func (c *Client) GetTrades(ctx context.Context, params GetTradesParams) (*models
 
 // GetCandlesticksParams contains parameters for getting candlesticks
 type GetCandlesticksParams struct {
-	Ticker     string
-	Period     string
-	StartTime  int64
-	EndTime    int64
+	SeriesTicker string
+	Ticker       string
+	Period       string
+	StartTime    int64
+	EndTime      int64
 }
 
 // GetCandlesticks retrieves candlestick data for a market
@@ -162,7 +163,7 @@ func (c *Client) GetCandlesticks(ctx context.Context, params GetCandlesticksPara
 		queryParams["end_ts"] = strconv.FormatInt(params.EndTime, 10)
 	}
 
-	path := TradeAPIPrefix + "/markets/" + params.Ticker + "/candlesticks" + BuildQueryString(queryParams)
+	path := TradeAPIPrefix + "/series/" + params.SeriesTicker + "/markets/" + params.Ticker + "/candlesticks" + BuildQueryString(queryParams)
 
 	var result models.CandlesticksResponse
 	if err := c.DoRequest(ctx, "GET", path, nil, &result); err != nil {
@@ -177,14 +178,8 @@ func periodToInterval(period string) string {
 	switch period {
 	case "1m":
 		return "1"
-	case "5m":
-		return "5"
-	case "15m":
-		return "15"
 	case "1h":
 		return "60"
-	case "4h":
-		return "240"
 	case "1d":
 		return "1440"
 	default:

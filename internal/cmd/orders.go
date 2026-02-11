@@ -101,14 +101,18 @@ var ordersQueueCmd = &cobra.Command{
 
 // Flags
 var (
-	orderStatusFilter string
-	orderMarketFilter string
-	orderSide         string
-	orderQty          int
-	orderPrice        int
-	orderAction       string
-	orderType         string
-	batchFile         string
+	orderStatusFilter   string
+	orderMarketFilter   string
+	orderCreateMarket   string
+	orderCancelAllMarket string
+	orderSide           string
+	orderCreateQty      int
+	orderCreatePrice    int
+	orderAmendQty       int
+	orderAmendPrice     int
+	orderAction         string
+	orderType           string
+	batchFile           string
 )
 
 func init() {
@@ -128,10 +132,10 @@ func init() {
 	ordersListCmd.Flags().StringVar(&orderMarketFilter, "market", "", "filter by market ticker")
 
 	// Create flags
-	ordersCreateCmd.Flags().StringVar(&orderMarketFilter, "market", "", "market ticker (required)")
+	ordersCreateCmd.Flags().StringVar(&orderCreateMarket, "market", "", "market ticker (required)")
 	ordersCreateCmd.Flags().StringVar(&orderSide, "side", "", "order side: yes or no (required)")
-	ordersCreateCmd.Flags().IntVar(&orderQty, "qty", 0, "quantity (required)")
-	ordersCreateCmd.Flags().IntVar(&orderPrice, "price", 0, "price in cents 1-99 (required)")
+	ordersCreateCmd.Flags().IntVar(&orderCreateQty, "qty", 0, "quantity (required)")
+	ordersCreateCmd.Flags().IntVar(&orderCreatePrice, "price", 0, "price in cents 1-99 (required)")
 	ordersCreateCmd.Flags().StringVar(&orderAction, "action", "buy", "order action: buy or sell (default: buy)")
 	ordersCreateCmd.Flags().StringVar(&orderType, "type", "limit", "order type: limit or market (default: limit)")
 	ordersCreateCmd.MarkFlagRequired("market")
@@ -140,11 +144,11 @@ func init() {
 	ordersCreateCmd.MarkFlagRequired("price")
 
 	// Cancel all flags
-	ordersCancelAllCmd.Flags().StringVar(&orderMarketFilter, "market", "", "filter by market ticker")
+	ordersCancelAllCmd.Flags().StringVar(&orderCancelAllMarket, "market", "", "filter by market ticker")
 
 	// Amend flags
-	ordersAmendCmd.Flags().IntVar(&orderQty, "qty", 0, "new quantity")
-	ordersAmendCmd.Flags().IntVar(&orderPrice, "price", 0, "new price in cents")
+	ordersAmendCmd.Flags().IntVar(&orderAmendQty, "qty", 0, "new quantity")
+	ordersAmendCmd.Flags().IntVar(&orderAmendPrice, "price", 0, "new price in cents")
 
 	// Batch create flags
 	ordersBatchCreateCmd.Flags().StringVar(&batchFile, "file", "", "path to JSON file containing orders (required)")
@@ -225,8 +229,8 @@ func runOrdersGet(cmd *cobra.Command, args []string) error {
 
 func runOrdersCreate(cmd *cobra.Command, args []string) error {
 	// Validate price range
-	if orderPrice < 1 || orderPrice > 99 {
-		return fmt.Errorf("price must be between 1 and 99 cents, got %d", orderPrice)
+	if orderCreatePrice < 1 || orderCreatePrice > 99 {
+		return fmt.Errorf("price must be between 1 and 99 cents, got %d", orderCreatePrice)
 	}
 
 	// Validate side
@@ -248,23 +252,23 @@ func runOrdersCreate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Validate quantity
-	if orderQty <= 0 {
-		return fmt.Errorf("quantity must be positive, got %d", orderQty)
+	if orderCreateQty <= 0 {
+		return fmt.Errorf("quantity must be positive, got %d", orderCreateQty)
 	}
 
 	// Build order request
 	orderReq := models.CreateOrderRequest{
-		Ticker: orderMarketFilter,
+		Ticker: orderCreateMarket,
 		Side:   models.OrderSide(side),
 		Action: models.OrderAction(action),
 		Type:   models.OrderType(oType),
-		Count:  orderQty,
+		Count:  orderCreateQty,
 	}
 
 	if side == "yes" {
-		orderReq.YesPrice = orderPrice
+		orderReq.YesPrice = orderCreatePrice
 	} else {
-		orderReq.NoPrice = orderPrice
+		orderReq.NoPrice = orderCreatePrice
 	}
 
 	// Show order preview
@@ -277,11 +281,11 @@ func runOrdersCreate(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Action:       %s\n", strings.ToUpper(action))
 	fmt.Printf("  Type:         %s\n", strings.ToUpper(oType))
 	fmt.Printf("  Quantity:     %d contracts\n", orderReq.Count)
-	fmt.Printf("  Price:        %d cents\n", orderPrice)
+	fmt.Printf("  Price:        %d cents\n", orderCreatePrice)
 
 	// Calculate potential cost/payout
-	potentialCost := orderQty * orderPrice
-	potentialPayout := orderQty * 100
+	potentialCost := orderCreateQty * orderCreatePrice
+	potentialPayout := orderCreateQty * 100
 
 	if action == "buy" {
 		fmt.Printf("  Max Cost:     %s\n", ui.FormatPrice(potentialCost))
@@ -362,7 +366,7 @@ func runOrdersCancel(cmd *cobra.Command, args []string) error {
 }
 
 func runOrdersCancelAll(cmd *cobra.Command, args []string) error {
-	ticker := orderMarketFilter
+	ticker := orderCancelAllMarket
 
 	prompt := "Cancel ALL resting orders?"
 	if ticker != "" {
@@ -405,21 +409,21 @@ func runOrdersCancelAll(cmd *cobra.Command, args []string) error {
 func runOrdersAmend(cmd *cobra.Command, args []string) error {
 	orderID := args[0]
 
-	if orderQty == 0 && orderPrice == 0 {
+	if orderAmendQty == 0 && orderAmendPrice == 0 {
 		return fmt.Errorf("at least one of --qty or --price must be specified")
 	}
 
-	if orderPrice != 0 && (orderPrice < 1 || orderPrice > 99) {
-		return fmt.Errorf("price must be between 1 and 99 cents, got %d", orderPrice)
+	if orderAmendPrice != 0 && (orderAmendPrice < 1 || orderAmendPrice > 99) {
+		return fmt.Errorf("price must be between 1 and 99 cents, got %d", orderAmendPrice)
 	}
 
 	// Build amend request
 	amendReq := models.AmendOrderRequest{}
-	if orderQty > 0 {
-		amendReq.Count = orderQty
+	if orderAmendQty > 0 {
+		amendReq.Count = orderAmendQty
 	}
-	if orderPrice > 0 {
-		amendReq.Price = orderPrice
+	if orderAmendPrice > 0 {
+		amendReq.Price = orderAmendPrice
 	}
 
 	// Show amendment preview
@@ -428,11 +432,11 @@ func runOrdersAmend(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Printf("  Environment:  %s\n", getEnvironmentLabel())
 	fmt.Printf("  Order ID:     %s\n", orderID)
-	if orderQty > 0 {
-		fmt.Printf("  New Quantity: %d contracts\n", orderQty)
+	if orderAmendQty > 0 {
+		fmt.Printf("  New Quantity: %d contracts\n", orderAmendQty)
 	}
-	if orderPrice > 0 {
-		fmt.Printf("  New Price:    %d cents\n", orderPrice)
+	if orderAmendPrice > 0 {
+		fmt.Printf("  New Price:    %d cents\n", orderAmendPrice)
 	}
 	fmt.Println()
 
@@ -625,7 +629,7 @@ func renderOrdersTable(orders []models.Order) {
 			order.Ticker,
 			strings.ToUpper(string(order.Side)),
 			fmt.Sprintf("%d", price),
-			fmt.Sprintf("%d/%d", order.RemainingQuantity, order.InitialQuantity),
+			fmt.Sprintf("%d/%d", order.RemainingCount, order.InitialCount),
 			formatOrderStatusModel(order.Status),
 			order.CreatedTime.Format("2006-01-02 15:04"),
 		})
@@ -645,7 +649,7 @@ func renderOrdersPlain(orders []models.Order) {
 			order.Ticker,
 			order.Side,
 			price,
-			order.RemainingQuantity,
+			order.RemainingCount,
 			order.Status,
 		)
 	}
@@ -665,21 +669,20 @@ func renderOrderDetails(order models.Order) {
 		{"Action", strings.ToUpper(string(order.Action))},
 		{"Type", strings.ToUpper(string(order.Type))},
 		{"Price", fmt.Sprintf("%d cents", price)},
-		{"Initial Qty", fmt.Sprintf("%d", order.InitialQuantity)},
-		{"Remaining Qty", fmt.Sprintf("%d", order.RemainingQuantity)},
-		{"Filled Qty", fmt.Sprintf("%d", order.FilledQuantity)},
-		{"Avg Fill Price", fmt.Sprintf("%d cents", order.AverageFillPrice)},
+		{"Initial Qty", fmt.Sprintf("%d", order.InitialCount)},
+		{"Remaining Qty", fmt.Sprintf("%d", order.RemainingCount)},
+		{"Filled Qty", fmt.Sprintf("%d", order.FillCount)},
 		{"Created", order.CreatedTime.Format("2006-01-02 15:04:05")},
 		{"Last Updated", order.LastUpdateTime.Format("2006-01-02 15:04:05")},
 	}
 
-	if order.TakerFillCount > 0 {
+	if order.TakerFillCost > 0 || order.TakerFees > 0 {
 		pairs = append(pairs, []string{"Taker Fills", fmt.Sprintf("%d", order.TakerFillCount)})
 		pairs = append(pairs, []string{"Taker Cost", ui.FormatPrice(order.TakerFillCost)})
 		pairs = append(pairs, []string{"Taker Fees", ui.FormatPrice(order.TakerFees)})
 	}
 
-	if order.MakerFillCount > 0 {
+	if order.MakerFillCost > 0 || order.MakerFees > 0 {
 		pairs = append(pairs, []string{"Maker Fills", fmt.Sprintf("%d", order.MakerFillCount)})
 		pairs = append(pairs, []string{"Maker Cost", ui.FormatPrice(order.MakerFillCost)})
 		pairs = append(pairs, []string{"Maker Fees", ui.FormatPrice(order.MakerFees)})
@@ -709,8 +712,8 @@ func renderOrderPlain(order models.Order) {
 		order.Side,
 		order.Status,
 		price,
-		order.RemainingQuantity,
-		order.InitialQuantity,
+		order.RemainingCount,
+		order.InitialCount,
 		order.CreatedTime.Format("2006-01-02T15:04:05Z"),
 	)
 }

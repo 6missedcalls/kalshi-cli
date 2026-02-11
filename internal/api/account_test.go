@@ -249,7 +249,7 @@ func TestDeleteAPIKey(t *testing.T) {
 					t.Errorf("expected DELETE request, got %s", r.Method)
 				}
 
-				expectedPath := "/api-keys/" + tt.keyID
+				expectedPath := TradeAPIPrefix + "/api-keys/" + tt.keyID
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -313,7 +313,7 @@ func TestGetAPILimits(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
-				expectedPath := "/account/api-limits"
+				expectedPath := TradeAPIPrefix + "/account/api-limits"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -398,7 +398,7 @@ func TestGenerateAPIKey(t *testing.T) {
 					t.Errorf("expected POST request, got %s", r.Method)
 				}
 
-				expectedPath := "/api-keys/generate"
+				expectedPath := TradeAPIPrefix + "/api-keys/generate"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
@@ -512,7 +512,7 @@ func TestCreateAPIKeyWithPublicKey(t *testing.T) {
 					t.Errorf("expected POST request, got %s", r.Method)
 				}
 
-				expectedPath := "/api-keys"
+				expectedPath := TradeAPIPrefix + "/api-keys"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}

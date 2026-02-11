@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -72,7 +73,7 @@ func TestSign(t *testing.T) {
 	method := "GET"
 	path := "/trade-api/v2/markets"
 
-	signature, err := signer.Sign(timestamp, method, path, "")
+	signature, err := signer.Sign(timestamp, method, path)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}
@@ -101,9 +102,7 @@ func TestSignWithBody(t *testing.T) {
 	timestamp := time.Now().UTC()
 	method := "POST"
 	path := "/trade-api/v2/orders"
-	body := `{"ticker":"BTC-100K","side":"yes","count":10}`
-
-	signature, err := signer.Sign(timestamp, method, path, body)
+	signature, err := signer.Sign(timestamp, method, path)
 	if err != nil {
 		t.Fatalf("Sign failed: %v", err)
 	}
@@ -114,43 +113,42 @@ func TestSignWithBody(t *testing.T) {
 }
 
 func TestBuildAuthMessage(t *testing.T) {
+	ts := time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC)
+	tsMs := strconv.FormatInt(ts.UnixMilli(), 10)
+
 	tests := []struct {
 		name      string
 		timestamp time.Time
 		method    string
 		path      string
-		body      string
 		expected  string
 	}{
 		{
-			name:      "GET request without body",
-			timestamp: time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC),
+			name:      "GET request",
+			timestamp: ts,
 			method:    "GET",
 			path:      "/trade-api/v2/markets",
-			body:      "",
-			expected:  "2024-01-15T12:00:00ZGET/trade-api/v2/markets",
+			expected:  tsMs + "GET/trade-api/v2/markets",
 		},
 		{
-			name:      "POST request with body",
-			timestamp: time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC),
+			name:      "POST request",
+			timestamp: ts,
 			method:    "POST",
 			path:      "/trade-api/v2/orders",
-			body:      `{"ticker":"TEST"}`,
-			expected:  "2024-01-15T12:00:00ZPOST/trade-api/v2/orders{\"ticker\":\"TEST\"}",
+			expected:  tsMs + "POST/trade-api/v2/orders",
 		},
 		{
 			name:      "DELETE request",
-			timestamp: time.Date(2024, 1, 15, 12, 0, 0, 0, time.UTC),
+			timestamp: ts,
 			method:    "DELETE",
 			path:      "/trade-api/v2/orders/abc123",
-			body:      "",
-			expected:  "2024-01-15T12:00:00ZDELETE/trade-api/v2/orders/abc123",
+			expected:  tsMs + "DELETE/trade-api/v2/orders/abc123",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			msg := BuildAuthMessage(tt.timestamp, tt.method, tt.path, tt.body)
+			msg := BuildAuthMessage(tt.timestamp, tt.method, tt.path)
 			if msg != tt.expected {
 				t.Errorf("expected message:\n%s\ngot:\n%s", tt.expected, msg)
 			}
@@ -158,23 +156,6 @@ func TestBuildAuthMessage(t *testing.T) {
 	}
 }
 
-func TestAuthHeader(t *testing.T) {
-	privateKey, err := generateTestKey()
-	if err != nil {
-		t.Fatalf("failed to generate test key: %v", err)
-	}
-
-	signer, err := NewSigner("my-key-id", privateKey)
-	if err != nil {
-		t.Fatalf("NewSigner failed: %v", err)
-	}
-
-	header := signer.AuthHeader("base64signature")
-	expected := "KALSHI-API-KEY my-key-id:base64signature"
-	if header != expected {
-		t.Errorf("expected header '%s', got '%s'", expected, header)
-	}
-}
 
 func generateTestKey() (*rsa.PrivateKey, error) {
 	return rsa.GenerateKey(rand.Reader, 2048)

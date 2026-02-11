@@ -55,7 +55,7 @@ var marketsCandlesticksCmd = &cobra.Command{
 	Short: "Get market candlesticks",
 	Long: `Get candlestick (OHLCV) data for a specific market.
 
-Supported periods: 1m, 5m, 15m, 1h, 4h, 1d`,
+Supported periods: 1m, 1h, 1d`,
 	Args: cobra.ExactArgs(1),
 	RunE: runMarketsCandlesticks,
 }
@@ -87,8 +87,9 @@ var (
 	marketLimit    int
 	seriesTicker   string
 	tradesLimit    int
-	candlePeriod   string
-	seriesCategory string
+	candlePeriod       string
+	candleSeriesTicker string
+	seriesCategory     string
 	seriesLimit    int
 )
 
@@ -99,7 +100,9 @@ func init() {
 
 	marketsTradesCmd.Flags().IntVar(&tradesLimit, "limit", 100, "maximum number of trades to return")
 
-	marketsCandlesticksCmd.Flags().StringVar(&candlePeriod, "period", "1h", "candlestick period (1m, 5m, 15m, 1h, 4h, 1d)")
+	marketsCandlesticksCmd.Flags().StringVar(&candlePeriod, "period", "1h", "candlestick period (1m, 1h, 1d)")
+	marketsCandlesticksCmd.Flags().StringVar(&candleSeriesTicker, "series", "", "series ticker (required for candlesticks)")
+	marketsCandlesticksCmd.MarkFlagRequired("series")
 
 	seriesListCmd.Flags().StringVar(&seriesCategory, "category", "", "filter by category")
 	seriesListCmd.Flags().IntVar(&seriesLimit, "limit", 50, "maximum number of series to return")
@@ -368,8 +371,9 @@ func runMarketsCandlesticks(cmd *cobra.Command, args []string) error {
 
 	ctx := context.Background()
 	params := api.GetCandlesticksParams{
-		Ticker: ticker,
-		Period: candlePeriod,
+		SeriesTicker: candleSeriesTicker,
+		Ticker:       ticker,
+		Period:       candlePeriod,
 	}
 
 	result, err := client.GetCandlesticks(ctx, params)
@@ -537,10 +541,11 @@ func formatMarketTime(t time.Time) string {
 }
 
 func truncateMarketString(s string, maxLen int) string {
-	if len(s) <= maxLen {
+	runes := []rune(s)
+	if len(runes) <= maxLen {
 		return s
 	}
-	return s[:maxLen-3] + "..."
+	return string(runes[:maxLen-3]) + "..."
 }
 
 func maxInt(a, b int) int {

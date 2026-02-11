@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -225,11 +226,13 @@ func TestClient_Delete_Success(t *testing.T) {
 }
 
 func TestClient_RequestSigning(t *testing.T) {
-	var receivedAuth string
+	var receivedKey string
+	var receivedSignature string
 	var receivedTimestamp string
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedAuth = r.Header.Get("Authorization")
+		receivedKey = r.Header.Get("KALSHI-ACCESS-KEY")
+		receivedSignature = r.Header.Get("KALSHI-ACCESS-SIGNATURE")
 		receivedTimestamp = r.Header.Get("KALSHI-ACCESS-TIMESTAMP")
 
 		w.WriteHeader(http.StatusOK)
@@ -246,22 +249,26 @@ func TestClient_RequestSigning(t *testing.T) {
 		t.Fatalf("Get failed: %v", err)
 	}
 
-	if receivedAuth == "" {
-		t.Error("Authorization header not set")
+	if receivedKey == "" {
+		t.Error("KALSHI-ACCESS-KEY header not set")
 	}
 
-	if !strings.HasPrefix(receivedAuth, "KALSHI-API-KEY ") {
-		t.Errorf("Authorization header has wrong format: %s", receivedAuth)
+	if receivedKey != "test-api-key" {
+		t.Errorf("expected KALSHI-ACCESS-KEY 'test-api-key', got '%s'", receivedKey)
+	}
+
+	if receivedSignature == "" {
+		t.Error("KALSHI-ACCESS-SIGNATURE header not set")
 	}
 
 	if receivedTimestamp == "" {
 		t.Error("KALSHI-ACCESS-TIMESTAMP header not set")
 	}
 
-	// Timestamp should be in ISO 8601 format
-	_, err = time.Parse("2006-01-02T15:04:05Z", receivedTimestamp)
-	if err != nil {
-		t.Errorf("KALSHI-ACCESS-TIMESTAMP has wrong format: %s", receivedTimestamp)
+	// Timestamp should be milliseconds since epoch
+	_, parseErr := strconv.ParseInt(receivedTimestamp, 10, 64)
+	if parseErr != nil {
+		t.Errorf("KALSHI-ACCESS-TIMESTAMP should be milliseconds since epoch, got: %s", receivedTimestamp)
 	}
 }
 

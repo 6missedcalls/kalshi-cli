@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/6missedcalls/kalshi-cli/internal/api"
 	"github.com/6missedcalls/kalshi-cli/internal/config"
@@ -248,7 +249,7 @@ func buildClientOptions(cfg *config.Config, needsAuth bool) (websocket.ClientOpt
 		}
 
 		timestamp := time.Now().UTC()
-		signature, err := signer.Sign(timestamp, "GET", "/trade-api/ws/v2", "")
+		signature, err := signer.Sign(timestamp, "GET", "/trade-api/ws/v2")
 		if err != nil {
 			return opts, fmt.Errorf("failed to sign request: %w", err)
 		}
@@ -304,11 +305,37 @@ func requiresAuth(channels []websocket.Channel) bool {
 }
 
 func getSigner(_ *config.Config) (*api.Signer, error) {
+	// Try config file first (fast, no GUI prompts)
+	apiKeyID := viper.GetString("api_key_id")
+	privateKeyPath := viper.GetString("private_key_path")
+
+	// Check env vars
+	if apiKeyID == "" {
+		apiKeyID = os.Getenv("KALSHI_API_KEY_ID")
+	}
+	if privateKeyPath == "" {
+		privateKeyPath = os.Getenv("KALSHI_PRIVATE_KEY_FILE")
+	}
+
+	if apiKeyID != "" && privateKeyPath != "" {
+		pemData, err := os.ReadFile(privateKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read private key file: %w", err)
+		}
+		return api.NewSignerFromPEM(apiKeyID, string(pemData))
+	}
+
+	// Check KALSHI_PRIVATE_KEY env var (PEM content directly)
+	privateKeyPEM := os.Getenv("KALSHI_PRIVATE_KEY")
+	if apiKeyID != "" && privateKeyPEM != "" {
+		return api.NewSignerFromPEM(apiKeyID, privateKeyPEM)
+	}
+
+	// Last resort: keyring
 	keyringStore, err := config.NewKeyringStore()
 	if err != nil {
 		return nil, fmt.Errorf("failed to access keyring: %w", err)
 	}
-
 	creds, err := keyringStore.GetCredentials()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get credentials: %w", err)
@@ -316,7 +343,6 @@ func getSigner(_ *config.Config) (*api.Signer, error) {
 	if creds == nil {
 		return nil, fmt.Errorf("no credentials configured")
 	}
-
 	return api.NewSignerFromPEM(creds.APIKeyID, creds.PrivateKey)
 }
 

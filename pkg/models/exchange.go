@@ -2,12 +2,6 @@ package models
 
 import "time"
 
-// ExchangeStatus represents the exchange status
-type ExchangeStatus struct {
-	TradingActive  bool   `json:"trading_active"`
-	ExchangeActive bool   `json:"exchange_active"`
-}
-
 // ExchangeStatusResponse is the API response for exchange status
 type ExchangeStatusResponse struct {
 	ExchangeActive bool `json:"exchange_active"`
@@ -16,14 +10,33 @@ type ExchangeStatusResponse struct {
 
 // ExchangeSchedule represents the exchange schedule
 type ExchangeSchedule struct {
-	ScheduleEntries []ScheduleEntry `json:"schedule_entries"`
+	StandardHours      []WeeklySchedule    `json:"standard_hours"`
+	MaintenanceWindows []MaintenanceWindow `json:"maintenance_windows"`
 }
 
-// ScheduleEntry represents a schedule entry
-type ScheduleEntry struct {
-	StartTime     time.Time `json:"start_time"`
-	EndTime       time.Time `json:"end_time"`
-	Maintenance   bool      `json:"maintenance"`
+// WeeklySchedule represents a weekly schedule block
+type WeeklySchedule struct {
+	StartTime string          `json:"start_time"`
+	EndTime   string          `json:"end_time"`
+	Monday    []DailySchedule `json:"monday"`
+	Tuesday   []DailySchedule `json:"tuesday"`
+	Wednesday []DailySchedule `json:"wednesday"`
+	Thursday  []DailySchedule `json:"thursday"`
+	Friday    []DailySchedule `json:"friday"`
+	Saturday  []DailySchedule `json:"saturday"`
+	Sunday    []DailySchedule `json:"sunday"`
+}
+
+// DailySchedule represents open/close times for a day
+type DailySchedule struct {
+	OpenTime  string `json:"open_time"`
+	CloseTime string `json:"close_time"`
+}
+
+// MaintenanceWindow represents a scheduled maintenance window
+type MaintenanceWindow struct {
+	StartDatetime string `json:"start_datetime"`
+	EndDatetime   string `json:"end_datetime"`
 }
 
 // ExchangeScheduleResponse is the API response for schedule
@@ -33,12 +46,12 @@ type ExchangeScheduleResponse struct {
 
 // Announcement represents an exchange announcement
 type Announcement struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Message     string    `json:"message"`
-	Status      string    `json:"status"`
-	Type        string    `json:"type"`
-	CreatedTime time.Time `json:"created_time"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	Message      string    `json:"message"`
+	Status       string    `json:"status"`
+	Type         string    `json:"type"`
+	CreatedTime  time.Time `json:"created_time"`
 	DeliveryTime time.Time `json:"delivery_time"`
 }
 

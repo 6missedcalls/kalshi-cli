@@ -173,12 +173,9 @@ func TestBalanceResponseFullFields(t *testing.T) {
 		}
 
 		resp := models.BalanceResponse{
-			Balance:                 100000,
-			AvailableBalance:        85000,
-			PortfolioValue:          50000,
-			BonusCashBalance:        1000,
-			TotalRestingOrdersValue: 15000,
-			PayoutBalance:           2000,
+			Balance:        100000,
+			PortfolioValue: 50000,
+			UpdatedTs:      1700000000,
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(resp)
@@ -194,20 +191,11 @@ func TestBalanceResponseFullFields(t *testing.T) {
 	if result.Balance != 100000 {
 		t.Errorf("expected balance 100000, got %d", result.Balance)
 	}
-	if result.AvailableBalance != 85000 {
-		t.Errorf("expected available_balance 85000, got %d", result.AvailableBalance)
-	}
 	if result.PortfolioValue != 50000 {
 		t.Errorf("expected portfolio_value 50000, got %d", result.PortfolioValue)
 	}
-	if result.BonusCashBalance != 1000 {
-		t.Errorf("expected bonus_cash_balance 1000, got %d", result.BonusCashBalance)
-	}
-	if result.TotalRestingOrdersValue != 15000 {
-		t.Errorf("expected total_resting_orders_value 15000, got %d", result.TotalRestingOrdersValue)
-	}
-	if result.PayoutBalance != 2000 {
-		t.Errorf("expected payout_balance 2000, got %d", result.PayoutBalance)
+	if result.UpdatedTs != 1700000000 {
+		t.Errorf("expected updated_ts 1700000000, got %d", result.UpdatedTs)
 	}
 }
 

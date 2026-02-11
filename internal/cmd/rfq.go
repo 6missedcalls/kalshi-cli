@@ -14,12 +14,12 @@ import (
 )
 
 var (
-	rfqStatus    string
-	rfqMarket    string
-	rfqSide      string
-	rfqQuantity  int
-	quoteRFQID   string
-	quotePrice   int
+	rfqStatus         string
+	rfqMarket         string
+	rfqQuantity       int
+	quotesListRFQID   string
+	quotesCreateRFQID string
+	quotePrice        int
 )
 
 var rfqCmd = &cobra.Command{
@@ -50,7 +50,7 @@ var rfqCreateCmd = &cobra.Command{
 	Use:   "create",
 	Short: "Create a new RFQ",
 	Long:  `Create a new Request for Quote for block trading.`,
-	Example: `  kalshi-cli rfq create --market INXD-25FEB07 --side yes --qty 1000`,
+	Example: `  kalshi-cli rfq create --market INXD-25FEB07 --qty 1000`,
 	RunE: runRFQCreate,
 }
 
@@ -110,17 +110,15 @@ func init() {
 
 	// RFQ create flags
 	rfqCreateCmd.Flags().StringVar(&rfqMarket, "market", "", "Market ticker (required)")
-	rfqCreateCmd.Flags().StringVar(&rfqSide, "side", "", "Side: yes or no (required)")
 	rfqCreateCmd.Flags().IntVar(&rfqQuantity, "qty", 0, "Quantity (required)")
 	rfqCreateCmd.MarkFlagRequired("market")
-	rfqCreateCmd.MarkFlagRequired("side")
 	rfqCreateCmd.MarkFlagRequired("qty")
 
 	// Quotes list flags
-	quotesListCmd.Flags().StringVar(&quoteRFQID, "rfq-id", "", "Filter by RFQ ID")
+	quotesListCmd.Flags().StringVar(&quotesListRFQID, "rfq-id", "", "Filter by RFQ ID")
 
 	// Quotes create flags
-	quotesCreateCmd.Flags().StringVar(&quoteRFQID, "rfq", "", "RFQ ID (required)")
+	quotesCreateCmd.Flags().StringVar(&quotesCreateRFQID, "rfq", "", "RFQ ID (required)")
 	quotesCreateCmd.Flags().IntVar(&quotePrice, "price", 0, "Price in cents (required)")
 	quotesCreateCmd.MarkFlagRequired("rfq")
 	quotesCreateCmd.MarkFlagRequired("price")
@@ -191,11 +189,6 @@ func runRFQGet(cmd *cobra.Command, args []string) error {
 }
 
 func runRFQCreate(cmd *cobra.Command, args []string) error {
-	side := strings.ToLower(rfqSide)
-	if side != "yes" && side != "no" {
-		return fmt.Errorf("side must be 'yes' or 'no', got: %s", rfqSide)
-	}
-
 	if rfqQuantity <= 0 {
 		return fmt.Errorf("quantity must be greater than 0")
 	}
@@ -209,15 +202,14 @@ func runRFQCreate(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	result, err := client.CreateRFQ(ctx, models.CreateRFQRequest{
-		Ticker:   rfqMarket,
-		Side:     side,
-		Quantity: rfqQuantity,
+		MarketTicker: rfqMarket,
+		Contracts:    rfqQuantity,
 	})
 	if err != nil {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("RFQ created: %s", result.RFQ.RFQID))
+	PrintSuccess(fmt.Sprintf("RFQ created: %s", result.RFQ.ID))
 
 	return ui.Output(
 		GetOutputFormat(),
@@ -261,7 +253,7 @@ func runQuotesList(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	result, err := client.GetQuotes(ctx, api.QuotesOptions{
-		RFQID: quoteRFQID,
+		RFQID: quotesListRFQID,
 	})
 	if err != nil {
 		return err
@@ -289,14 +281,14 @@ func runQuotesCreate(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	result, err := client.CreateQuote(ctx, models.CreateQuoteRequest{
-		RFQID: quoteRFQID,
-		Price: quotePrice,
+		RFQID:  quotesCreateRFQID,
+		YesBid: quotePrice,
 	})
 	if err != nil {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Quote created: %s", result.Quote.QuoteID))
+	PrintSuccess(fmt.Sprintf("Quote created: %s", result.Quote.ID))
 
 	return ui.Output(
 		GetOutputFormat(),
@@ -327,7 +319,7 @@ func runQuotesAccept(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Quote %s accepted", result.Quote.QuoteID))
+	PrintSuccess(fmt.Sprintf("Quote %s accepted", result.Quote.ID))
 
 	return ui.Output(
 		GetOutputFormat(),
@@ -358,7 +350,7 @@ func runQuotesConfirm(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	PrintSuccess(fmt.Sprintf("Quote %s confirmed", result.Quote.QuoteID))
+	PrintSuccess(fmt.Sprintf("Quote %s confirmed", result.Quote.ID))
 
 	return ui.Output(
 		GetOutputFormat(),
@@ -376,18 +368,16 @@ func renderRFQsTable(rfqs []models.RFQ) {
 		return
 	}
 
-	headers := []string{"ID", "Ticker", "Side", "Quantity", "Status", "Created", "Expires"}
+	headers := []string{"ID", "Market", "Contracts", "Status", "Created"}
 	var rows [][]string
 
 	for _, rfq := range rfqs {
 		rows = append(rows, []string{
-			rfq.RFQID,
-			rfq.Ticker,
-			formatSide(rfq.Side),
-			fmt.Sprintf("%d", rfq.Quantity),
+			rfq.ID,
+			rfq.MarketTicker,
+			fmt.Sprintf("%d", rfq.Contracts),
 			formatStatus(rfq.Status),
-			rfq.CreatedTime.Format("2006-01-02 15:04"),
-			rfq.ExpiresTime.Format("2006-01-02 15:04"),
+			rfq.CreatedTs,
 		})
 	}
 
@@ -396,27 +386,25 @@ func renderRFQsTable(rfqs []models.RFQ) {
 
 func renderRFQsPlain(rfqs []models.RFQ) {
 	for _, rfq := range rfqs {
-		fmt.Printf("%s\t%s\t%s\t%d\t%s\n",
-			rfq.RFQID, rfq.Ticker, rfq.Side, rfq.Quantity, rfq.Status)
+		fmt.Printf("%s\t%s\t%d\t%s\n",
+			rfq.ID, rfq.MarketTicker, rfq.Contracts, rfq.Status)
 	}
 }
 
 func renderRFQDetail(rfq *models.RFQ) {
 	pairs := [][]string{
-		{"RFQ ID", rfq.RFQID},
-		{"Ticker", rfq.Ticker},
-		{"Side", formatSide(rfq.Side)},
-		{"Quantity", fmt.Sprintf("%d", rfq.Quantity)},
+		{"RFQ ID", rfq.ID},
+		{"Market", rfq.MarketTicker},
+		{"Contracts", fmt.Sprintf("%d", rfq.Contracts)},
 		{"Status", formatStatus(rfq.Status)},
-		{"Created", rfq.CreatedTime.Format("2006-01-02 15:04:05")},
-		{"Expires", rfq.ExpiresTime.Format("2006-01-02 15:04:05")},
+		{"Created", rfq.CreatedTs},
 	}
 	ui.RenderKeyValue(pairs)
 }
 
 func renderRFQDetailPlain(rfq *models.RFQ) {
-	fmt.Printf("rfq_id=%s ticker=%s side=%s qty=%d status=%s\n",
-		rfq.RFQID, rfq.Ticker, rfq.Side, rfq.Quantity, rfq.Status)
+	fmt.Printf("rfq_id=%s market=%s qty=%d status=%s\n",
+		rfq.ID, rfq.MarketTicker, rfq.Contracts, rfq.Status)
 }
 
 // Quote rendering functions
@@ -427,19 +415,19 @@ func renderQuotesTable(quotes []models.Quote) {
 		return
 	}
 
-	headers := []string{"Quote ID", "RFQ ID", "Ticker", "Side", "Price", "Qty", "Status", "Created"}
+	headers := []string{"Quote ID", "RFQ ID", "Market", "Yes Bid", "No Bid", "Contracts", "Status", "Created"}
 	var rows [][]string
 
 	for _, quote := range quotes {
 		rows = append(rows, []string{
-			quote.QuoteID,
+			quote.ID,
 			quote.RFQID,
-			quote.Ticker,
-			formatSide(quote.Side),
-			ui.FormatPrice(quote.Price),
-			fmt.Sprintf("%d", quote.Quantity),
+			quote.MarketTicker,
+			ui.FormatPrice(quote.YesBid),
+			ui.FormatPrice(quote.NoBid),
+			fmt.Sprintf("%d", quote.Contracts),
 			formatStatus(quote.Status),
-			quote.CreatedTime.Format("2006-01-02 15:04"),
+			quote.CreatedTs,
 		})
 	}
 
@@ -448,45 +436,33 @@ func renderQuotesTable(quotes []models.Quote) {
 
 func renderQuotesPlain(quotes []models.Quote) {
 	for _, quote := range quotes {
-		fmt.Printf("%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
-			quote.QuoteID, quote.RFQID, quote.Ticker, quote.Side,
-			quote.Price, quote.Quantity, quote.Status)
+		fmt.Printf("%s\t%s\t%s\t%d\t%d\t%d\t%s\n",
+			quote.ID, quote.RFQID, quote.MarketTicker,
+			quote.YesBid, quote.NoBid, quote.Contracts, quote.Status)
 	}
 }
 
 func renderQuoteDetail(quote *models.Quote) {
 	pairs := [][]string{
-		{"Quote ID", quote.QuoteID},
+		{"Quote ID", quote.ID},
 		{"RFQ ID", quote.RFQID},
-		{"Ticker", quote.Ticker},
-		{"Side", formatSide(quote.Side)},
-		{"Price", ui.FormatPrice(quote.Price)},
-		{"Quantity", fmt.Sprintf("%d", quote.Quantity)},
+		{"Market", quote.MarketTicker},
+		{"Yes Bid", ui.FormatPrice(quote.YesBid)},
+		{"No Bid", ui.FormatPrice(quote.NoBid)},
+		{"Contracts", fmt.Sprintf("%d", quote.Contracts)},
 		{"Status", formatStatus(quote.Status)},
-		{"Created", quote.CreatedTime.Format("2006-01-02 15:04:05")},
-		{"Expires", quote.ExpiresTime.Format("2006-01-02 15:04:05")},
+		{"Created", quote.CreatedTs},
 	}
 	ui.RenderKeyValue(pairs)
 }
 
 func renderQuoteDetailPlain(quote *models.Quote) {
-	fmt.Printf("quote_id=%s rfq_id=%s ticker=%s side=%s price=%d qty=%d status=%s\n",
-		quote.QuoteID, quote.RFQID, quote.Ticker, quote.Side,
-		quote.Price, quote.Quantity, quote.Status)
+	fmt.Printf("quote_id=%s rfq_id=%s market=%s yes_bid=%d no_bid=%d qty=%d status=%s\n",
+		quote.ID, quote.RFQID, quote.MarketTicker,
+		quote.YesBid, quote.NoBid, quote.Contracts, quote.Status)
 }
 
 // Helper functions
-
-func formatSide(side string) string {
-	switch strings.ToLower(side) {
-	case "yes":
-		return ui.SuccessStyle.Render("YES")
-	case "no":
-		return ui.ErrorStyle.Render("NO")
-	default:
-		return side
-	}
-}
 
 func formatStatus(status string) string {
 	switch strings.ToLower(status) {

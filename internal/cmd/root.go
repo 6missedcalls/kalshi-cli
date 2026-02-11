@@ -56,6 +56,8 @@ func init() {
 	viper.BindPFlag("api.production", rootCmd.PersistentFlags().Lookup("prod"))
 	viper.BindPFlag("output.json", rootCmd.PersistentFlags().Lookup("json"))
 	viper.BindPFlag("output.plain", rootCmd.PersistentFlags().Lookup("plain"))
+
+	rootCmd.AddCommand(versionCmd)
 }
 
 func initConfig() error {
@@ -115,10 +117,6 @@ func SetVersionInfo(version, commit, date string) {
 	buildCommit = commit
 	buildDate = date
 	rootCmd.Version = version
-}
-
-func init() {
-	rootCmd.AddCommand(versionCmd)
 }
 
 var versionCmd = &cobra.Command{

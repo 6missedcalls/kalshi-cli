@@ -68,6 +68,7 @@ var (
 	eventsStatus          string
 	eventsLimit           int
 	eventsCursor          string
+	eventSeriesTicker     string
 	candlesticksPeriod    string
 	candlesticksStartTime string
 	candlesticksEndTime   string
@@ -83,7 +84,9 @@ func init() {
 	eventsListCmd.Flags().IntVar(&eventsLimit, "limit", 50, "maximum number of events to return")
 	eventsListCmd.Flags().StringVar(&eventsCursor, "cursor", "", "pagination cursor")
 
-	eventsCandlesticksCmd.Flags().StringVar(&candlesticksPeriod, "period", "1h", "candlestick period (1m, 5m, 15m, 1h, 4h, 1d)")
+	eventsCandlesticksCmd.Flags().StringVar(&eventSeriesTicker, "series", "", "series ticker (required for candlesticks)")
+	eventsCandlesticksCmd.MarkFlagRequired("series")
+	eventsCandlesticksCmd.Flags().StringVar(&candlesticksPeriod, "period", "1h", "candlestick period (1m, 1h, 1d)")
 	eventsCandlesticksCmd.Flags().StringVar(&candlesticksStartTime, "start", "", "start time (RFC3339 format)")
 	eventsCandlesticksCmd.Flags().StringVar(&candlesticksEndTime, "end", "", "end time (RFC3339 format)")
 
@@ -165,8 +168,9 @@ func runEventsCandlesticks(cmd *cobra.Command, args []string) error {
 	}
 
 	params := api.CandlesticksParams{
-		Ticker: ticker,
-		Period: candlesticksPeriod,
+		Ticker:       ticker,
+		SeriesTicker: eventSeriesTicker,
+		Period:       candlesticksPeriod,
 	}
 
 	if candlesticksStartTime != "" {
@@ -262,7 +266,7 @@ func runMultivariateGet(cmd *cobra.Command, args []string) error {
 // Table Rendering
 
 func renderEventsTable(events []models.Event, cursor string) {
-	headers := []string{"Ticker", "Title", "Category", "Status", "Markets"}
+	headers := []string{"Ticker", "Title", "Category", "Markets"}
 	rows := make([][]string, 0, len(events))
 
 	for _, e := range events {
@@ -270,7 +274,6 @@ func renderEventsTable(events []models.Event, cursor string) {
 			e.EventTicker,
 			truncateEventString(e.Title, 40),
 			e.Category,
-			formatEventStatus(e.Status),
 			strconv.Itoa(len(e.Markets)),
 		})
 	}
@@ -287,13 +290,10 @@ func renderEventDetails(event *models.Event) {
 		{"Ticker", event.EventTicker},
 		{"Series", event.SeriesTicker},
 		{"Title", event.Title},
-		{"Subtitle", event.Subtitle},
+		{"Subtitle", event.SubTitle},
 		{"Category", event.Category},
-		{"Status", formatEventStatus(event.Status)},
 		{"Mutually Exclusive", formatEventBool(event.MutuallyExclusive)},
-		{"Strike Date", formatEventTime(event.StrikeDate)},
-		{"Expected Expiration", formatEventTime(event.ExpectedExpiration)},
-		{"Created", formatEventTime(event.CreatedTime)},
+		{"Strike Date", formatEventTimePtr(event.StrikeDate)},
 		{"Markets Count", strconv.Itoa(len(event.Markets))},
 	}
 
@@ -369,8 +369,8 @@ func renderMultivariateEventDetails(event *models.MultivariateEvent) {
 
 func renderEventsPlain(events []models.Event) {
 	for _, e := range events {
-		fmt.Printf("%s\t%s\t%s\t%s\t%d\n",
-			e.EventTicker, e.Title, e.Category, e.Status, len(e.Markets))
+		fmt.Printf("%s\t%s\t%s\t%d\n",
+			e.EventTicker, e.Title, e.Category, len(e.Markets))
 	}
 }
 
@@ -379,7 +379,6 @@ func renderEventPlain(event *models.Event) {
 	fmt.Printf("series=%s\n", event.SeriesTicker)
 	fmt.Printf("title=%s\n", event.Title)
 	fmt.Printf("category=%s\n", event.Category)
-	fmt.Printf("status=%s\n", event.Status)
 	fmt.Printf("markets_count=%d\n", len(event.Markets))
 	if len(event.Markets) > 0 {
 		fmt.Printf("markets=%s\n", strings.Join(event.Markets, ","))
@@ -459,4 +458,11 @@ func formatEventTime(t time.Time) string {
 		return "-"
 	}
 	return t.Format("2006-01-02 15:04:05")
+}
+
+func formatEventTimePtr(t *time.Time) string {
+	if t == nil {
+		return "-"
+	}
+	return formatEventTime(*t)
 }

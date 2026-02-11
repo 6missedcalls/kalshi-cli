@@ -41,7 +41,7 @@ func TestListEvents(t *testing.T) {
 			params: ListEventsParams{Status: "open"},
 			serverResponse: models.EventsResponse{
 				Events: []models.Event{
-					{EventTicker: "ELECTION-2024", Title: "2024 Presidential Election", Status: "open"},
+					{EventTicker: "ELECTION-2024", Title: "2024 Presidential Election"},
 				},
 				Cursor: "",
 			},
@@ -141,7 +141,6 @@ func TestGetEvent(t *testing.T) {
 				Event: models.Event{
 					EventTicker: "ELECTION-2024",
 					Title:       "2024 Presidential Election",
-					Status:      "open",
 					Category:    "politics",
 				},
 			},
@@ -396,8 +395,9 @@ func TestGetEventCandlesticks(t *testing.T) {
 		{
 			name: "returns candlesticks successfully",
 			params: CandlesticksParams{
-				Ticker: "ELECTION-2024",
-				Period: "1h",
+				SeriesTicker: "ELECTION-SERIES",
+				Ticker:       "ELECTION-2024",
+				Period:       "1h",
 			},
 			serverResponse: models.CandlesticksResponse{
 				Candlesticks: []models.Candlestick{
@@ -412,10 +412,11 @@ func TestGetEventCandlesticks(t *testing.T) {
 		{
 			name: "returns candlesticks with time range",
 			params: CandlesticksParams{
-				Ticker:    "FED-MAR-2024",
-				Period:    "15m",
-				StartTime: func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
-				EndTime:   func() *time.Time { t := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC); return &t }(),
+				SeriesTicker: "FED-SERIES",
+				Ticker:       "FED-MAR-2024",
+				Period:       "15m",
+				StartTime:    func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
+				EndTime:      func() *time.Time { t := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC); return &t }(),
 			},
 			serverResponse: models.CandlesticksResponse{
 				Candlesticks: []models.Candlestick{
@@ -429,8 +430,9 @@ func TestGetEventCandlesticks(t *testing.T) {
 		{
 			name: "returns empty candlesticks for no data",
 			params: CandlesticksParams{
-				Ticker: "NO-DATA-EVENT",
-				Period: "1d",
+				SeriesTicker: "NO-DATA-SERIES",
+				Ticker:       "NO-DATA-EVENT",
+				Period:       "1d",
 			},
 			serverResponse: models.CandlesticksResponse{
 				Candlesticks: []models.Candlestick{},
@@ -442,8 +444,9 @@ func TestGetEventCandlesticks(t *testing.T) {
 		{
 			name: "handles not found error",
 			params: CandlesticksParams{
-				Ticker: "INVALID-EVENT",
-				Period: "1h",
+				SeriesTicker: "INVALID-SERIES",
+				Ticker:       "INVALID-EVENT",
+				Period:       "1h",
 			},
 			serverResponse: models.CandlesticksResponse{},
 			serverStatus:   http.StatusNotFound,
@@ -452,8 +455,9 @@ func TestGetEventCandlesticks(t *testing.T) {
 		{
 			name: "handles server error",
 			params: CandlesticksParams{
-				Ticker: "ERROR-EVENT",
-				Period: "1h",
+				SeriesTicker: "ERROR-SERIES",
+				Ticker:       "ERROR-EVENT",
+				Period:       "1h",
 			},
 			serverResponse: models.CandlesticksResponse{},
 			serverStatus:   http.StatusInternalServerError,
@@ -468,14 +472,15 @@ func TestGetEventCandlesticks(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
-				expectedPath := TradeAPIPrefix + "/events/" + tt.params.Ticker + "/candlesticks"
+				expectedPath := TradeAPIPrefix + "/series/" + tt.params.SeriesTicker + "/events/" + tt.params.Ticker + "/candlesticks"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 				}
 
 				if tt.params.Period != "" {
-					if got := r.URL.Query().Get("period"); got != tt.params.Period {
-						t.Errorf("expected period=%s, got %s", tt.params.Period, got)
+					expectedInterval := periodToInterval(tt.params.Period)
+					if got := r.URL.Query().Get("period_interval"); got != expectedInterval {
+						t.Errorf("expected period_interval=%s, got %s", expectedInterval, got)
 					}
 				}
 

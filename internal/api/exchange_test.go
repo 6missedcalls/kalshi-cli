@@ -102,46 +102,40 @@ func TestGetExchangeStatus(t *testing.T) {
 }
 
 func TestGetExchangeSchedule(t *testing.T) {
-	now := time.Now().UTC()
 	tests := []struct {
 		name           string
 		serverResponse models.ExchangeScheduleResponse
 		serverStatus   int
 		wantErr        bool
-		wantEntries    int
 	}{
 		{
 			name: "returns schedule successfully",
 			serverResponse: models.ExchangeScheduleResponse{
 				Schedule: models.ExchangeSchedule{
-					ScheduleEntries: []models.ScheduleEntry{
+					StandardHours: []models.WeeklySchedule{
 						{
-							StartTime:   now,
-							EndTime:     now.Add(8 * time.Hour),
-							Maintenance: false,
+							StartTime: "2024-01-15",
+							EndTime:   "2024-06-15",
 						},
+					},
+					MaintenanceWindows: []models.MaintenanceWindow{
 						{
-							StartTime:   now.Add(8 * time.Hour),
-							EndTime:     now.Add(10 * time.Hour),
-							Maintenance: true,
+							StartDatetime: "2024-01-20T02:00:00Z",
+							EndDatetime:   "2024-01-20T04:00:00Z",
 						},
 					},
 				},
 			},
 			serverStatus: http.StatusOK,
 			wantErr:      false,
-			wantEntries:  2,
 		},
 		{
 			name: "returns empty schedule",
 			serverResponse: models.ExchangeScheduleResponse{
-				Schedule: models.ExchangeSchedule{
-					ScheduleEntries: []models.ScheduleEntry{},
-				},
+				Schedule: models.ExchangeSchedule{},
 			},
 			serverStatus: http.StatusOK,
 			wantErr:      false,
-			wantEntries:  0,
 		},
 		{
 			name:           "handles server error",
@@ -172,8 +166,7 @@ func TestGetExchangeSchedule(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server.URL)
-			var resp models.ExchangeScheduleResponse
-			err := client.GetExchangeSchedule(context.Background(), &resp)
+			resp, err := client.GetExchangeSchedule(context.Background())
 
 			if tt.wantErr {
 				if err == nil {
@@ -186,8 +179,8 @@ func TestGetExchangeSchedule(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 
-			if len(resp.Schedule.ScheduleEntries) != tt.wantEntries {
-				t.Errorf("expected %d schedule entries, got %d", tt.wantEntries, len(resp.Schedule.ScheduleEntries))
+			if resp == nil {
+				t.Fatal("expected non-nil response")
 			}
 		})
 	}
@@ -266,8 +259,7 @@ func TestGetAnnouncements(t *testing.T) {
 			defer server.Close()
 
 			client := newTestClient(t, server.URL)
-			var resp models.AnnouncementsResponse
-			err := client.GetAnnouncements(context.Background(), &resp)
+			resp, err := client.GetAnnouncements(context.Background())
 
 			if tt.wantErr {
 				if err == nil {
@@ -301,11 +293,11 @@ func TestGetSeriesFeeChanges(t *testing.T) {
 			serverResponse: models.SeriesFeeChangesResponse{
 				SeriesFeeChanges: []models.SeriesFeeChange{
 					{
-						SeriesTicker:   "PRES",
-						OldFeeRate:     0.05,
-						NewFeeRate:     0.03,
-						EffectiveDate:  now.Add(24 * time.Hour),
-						AnnouncedDate:  now,
+						SeriesTicker:  "PRES",
+						OldFeeRate:    0.05,
+						NewFeeRate:    0.03,
+						EffectiveDate: now.Add(24 * time.Hour),
+						AnnouncedDate: now,
 					},
 				},
 			},
@@ -337,7 +329,6 @@ func TestGetSeriesFeeChanges(t *testing.T) {
 					t.Errorf("expected GET request, got %s", r.Method)
 				}
 
-				// Correct API path per Kalshi documentation
 				expectedPath := TradeAPIPrefix + "/exchange/series-fee-changes"
 				if r.URL.Path != expectedPath {
 					t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
@@ -445,7 +436,6 @@ func TestGetUserDataTimestamp(t *testing.T) {
 
 func TestGetExchangeStatusUsesCorrectPath(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Verify the correct path with TradeAPIPrefix
 		expectedPath := TradeAPIPrefix + "/exchange/status"
 		if r.URL.Path != expectedPath {
 			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
