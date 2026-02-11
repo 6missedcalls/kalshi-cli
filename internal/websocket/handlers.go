@@ -10,16 +10,16 @@ type Channel string
 
 const (
 	// Public channels (no auth required)
-	ChannelMarketTicker        Channel = "market_ticker"
-	ChannelMarketTickerV2      Channel = "market_ticker_v2"
-	ChannelPublicTrades        Channel = "public_trades"
-	ChannelMarketLifecycle     Channel = "market_lifecycle"
-	ChannelMultivariateLookups Channel = "multivariate_lookups"
+	ChannelMarketTicker        Channel = "ticker"
+	ChannelMarketTickerV2      Channel = "ticker_v2"
+	ChannelPublicTrades        Channel = "trade"
+	ChannelMarketLifecycle     Channel = "market_lifecycle_v2"
+	ChannelMultivariateLookups Channel = "multivariate"
 
 	// Authenticated channels
-	ChannelOrderbook         Channel = "orderbook"
+	ChannelOrderbook         Channel = "orderbook_delta"
 	ChannelUserOrders        Channel = "user_orders"
-	ChannelUserFills         Channel = "user_fills"
+	ChannelUserFills         Channel = "fill"
 	ChannelMarketPositions   Channel = "market_positions"
 	ChannelOrderGroupUpdates Channel = "order_group_updates"
 	ChannelCommunications    Channel = "communications"

@@ -17,45 +17,64 @@ var marketsCmd = &cobra.Command{
 	Use:   "markets",
 	Short: "Manage and view markets",
 	Long:  `Commands for listing, viewing, and analyzing prediction markets.`,
+	Example: `  kalshi-cli markets list --status open
+  kalshi-cli markets get INXD-25FEB07-B5523.99
+  kalshi-cli markets orderbook INXD-25FEB07-B5523.99
+  kalshi-cli markets trades INXD-25FEB07-B5523.99`,
 }
 
 var marketsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List markets",
 	Long:  `List markets with optional filtering by status and series.`,
-	RunE:  runMarketsList,
+	Example: `  kalshi-cli markets list
+  kalshi-cli markets list --status open --limit 20
+  kalshi-cli markets list --series INXD --json`,
+	RunE: runMarketsList,
 }
 
 var marketsGetCmd = &cobra.Command{
-	Use:   "get <ticker>",
+	Use:   "get <market-ticker>",
 	Short: "Get market details",
-	Long:  `Get detailed information about a specific market.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runMarketsGet,
+	Long: `Get detailed information about a specific market.
+
+Use 'kalshi-cli markets list' to find market tickers.`,
+	Example: `  kalshi-cli markets get INXD-25FEB07-B5523.99`,
+	Args:    cobra.ExactArgs(1),
+	RunE:    runMarketsGet,
 }
 
 var marketsOrderbookCmd = &cobra.Command{
-	Use:   "orderbook <ticker>",
+	Use:   "orderbook <market-ticker>",
 	Short: "Get market orderbook",
-	Long:  `Get the orderbook for a specific market with visual display.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runMarketsOrderbook,
+	Long: `Get the orderbook for a specific market with visual display.
+
+Shows YES bids and asks with quantities at each price level.`,
+	Example: `  kalshi-cli markets orderbook INXD-25FEB07-B5523.99
+  kalshi-cli markets orderbook INXD-25FEB07-B5523.99 --json`,
+	Args: cobra.ExactArgs(1),
+	RunE: runMarketsOrderbook,
 }
 
 var marketsTradesCmd = &cobra.Command{
-	Use:   "trades <ticker>",
+	Use:   "trades <market-ticker>",
 	Short: "Get market trades",
 	Long:  `Get recent trades for a specific market.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runMarketsTrades,
+	Example: `  kalshi-cli markets trades INXD-25FEB07-B5523.99
+  kalshi-cli markets trades INXD-25FEB07-B5523.99 --limit 20`,
+	Args: cobra.ExactArgs(1),
+	RunE: runMarketsTrades,
 }
 
 var marketsCandlesticksCmd = &cobra.Command{
-	Use:   "candlesticks <ticker>",
+	Use:   "candlesticks <market-ticker>",
 	Short: "Get market candlesticks",
 	Long: `Get candlestick (OHLCV) data for a specific market.
 
+Requires --series flag with the series ticker.
 Supported periods: 1m, 1h, 1d`,
+	Example: `  kalshi-cli markets candlesticks INXD-25FEB07-B5523.99 --series INXD
+  kalshi-cli markets candlesticks INXD-25FEB07-B5523.99 --series INXD --period 1d`,
 	Args: cobra.ExactArgs(1),
 	RunE: runMarketsCandlesticks,
 }
@@ -70,15 +89,18 @@ var seriesListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List series",
 	Long:  `List market series with optional category filtering.`,
-	RunE:  runSeriesList,
+	Example: `  kalshi-cli markets series list
+  kalshi-cli markets series list --category economics`,
+	RunE: runSeriesList,
 }
 
 var seriesGetCmd = &cobra.Command{
-	Use:   "get <ticker>",
-	Short: "Get series details",
-	Long:  `Get detailed information about a specific series.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runSeriesGet,
+	Use:     "get <series-ticker>",
+	Short:   "Get series details",
+	Long:    `Get detailed information about a specific series.`,
+	Example: `  kalshi-cli markets series get INXD`,
+	Args:    cobra.ExactArgs(1),
+	RunE:    runSeriesGet,
 }
 
 // Command flags

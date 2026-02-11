@@ -17,30 +17,50 @@ import (
 var eventsCmd = &cobra.Command{
 	Use:   "events",
 	Short: "Manage events",
-	Long:  `Commands for listing, viewing, and managing Kalshi events.`,
+	Long: `Commands for listing, viewing, and managing Kalshi events.
+
+An event groups related markets (e.g., "S&P 500 close on Feb 7" has
+multiple price-bracket markets under it).`,
+	Example: `  kalshi-cli events list --status active
+  kalshi-cli events get INXD-25FEB07
+  kalshi-cli events candlesticks INXD-25FEB07 --start 2025-02-01T00:00:00Z --end 2025-02-07T00:00:00Z`,
 }
 
 var eventsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List events",
 	Long:  `List events with optional filtering by status.`,
-	RunE:  runEventsList,
+	Example: `  kalshi-cli events list
+  kalshi-cli events list --status active --limit 20
+  kalshi-cli events list --json`,
+	RunE: runEventsList,
 }
 
 var eventsGetCmd = &cobra.Command{
-	Use:   "get <ticker>",
+	Use:   "get <event-ticker>",
 	Short: "Get event details",
-	Long:  `Get detailed information about a specific event by ticker.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runEventsGet,
+	Long: `Get detailed information about a specific event by ticker.
+
+Use 'kalshi-cli events list' to find event tickers.`,
+	Example: `  kalshi-cli events get INXD-25FEB07`,
+	Args:    cobra.ExactArgs(1),
+	RunE:    runEventsGet,
 }
 
 var eventsCandlesticksCmd = &cobra.Command{
-	Use:   "candlesticks <ticker>",
+	Use:   "candlesticks <event-ticker>",
 	Short: "Get event candlesticks",
-	Long:  `Get candlestick (OHLCV) data for an event.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runEventsCandlesticks,
+	Long: `Get candlestick (OHLCV) data for an event.
+
+The --series flag is optional; if omitted, the series ticker is
+auto-resolved from the event. Requires --start and --end timestamps.
+
+Supported periods: 1m, 1h, 1d`,
+	Example: `  kalshi-cli events candlesticks INXD-25FEB07 --start 2025-02-01T00:00:00Z --end 2025-02-07T00:00:00Z
+  kalshi-cli events candlesticks INXD-25FEB07 --period 1d --start 2025-01-01T00:00:00Z --end 2025-02-01T00:00:00Z
+  kalshi-cli events candlesticks INXD-25FEB07 --series INXD --period 1h --start 2025-02-06T00:00:00Z --end 2025-02-07T00:00:00Z`,
+	Args: cobra.ExactArgs(1),
+	RunE: runEventsCandlesticks,
 }
 
 var multivariateCmd = &cobra.Command{
@@ -84,8 +104,7 @@ func init() {
 	eventsListCmd.Flags().IntVar(&eventsLimit, "limit", 50, "maximum number of events to return")
 	eventsListCmd.Flags().StringVar(&eventsCursor, "cursor", "", "pagination cursor")
 
-	eventsCandlesticksCmd.Flags().StringVar(&eventSeriesTicker, "series", "", "series ticker (required for candlesticks)")
-	eventsCandlesticksCmd.MarkFlagRequired("series")
+	eventsCandlesticksCmd.Flags().StringVar(&eventSeriesTicker, "series", "", "series ticker (auto-resolved from event if not provided)")
 	eventsCandlesticksCmd.Flags().StringVar(&candlesticksPeriod, "period", "1h", "candlestick period (1m, 1h, 1d)")
 	eventsCandlesticksCmd.Flags().StringVar(&candlesticksStartTime, "start", "", "start time (RFC3339 format)")
 	eventsCandlesticksCmd.Flags().StringVar(&candlesticksEndTime, "end", "", "end time (RFC3339 format)")
@@ -167,9 +186,17 @@ func runEventsCandlesticks(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	seriesTicker, err := resolveSeriesTicker(ctx, client, ticker, eventSeriesTicker)
+	if err != nil {
+		return err
+	}
+
 	params := api.CandlesticksParams{
 		Ticker:       ticker,
-		SeriesTicker: eventSeriesTicker,
+		SeriesTicker: seriesTicker,
 		Period:       candlesticksPeriod,
 	}
 
@@ -189,9 +216,6 @@ func runEventsCandlesticks(cmd *cobra.Command, args []string) error {
 		params.EndTime = &t
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	candlesticks, err := client.GetEventCandlesticks(ctx, params)
 	if err != nil {
 		return fmt.Errorf("failed to get candlesticks: %w", err)
@@ -205,6 +229,26 @@ func runEventsCandlesticks(cmd *cobra.Command, args []string) error {
 		candlesticks,
 		func() { renderCandlesticksPlain(candlesticks) },
 	)
+}
+
+// resolveSeriesTicker returns the series ticker for the candlesticks API call.
+// If explicitSeries is provided (via --series flag), it is returned directly.
+// Otherwise, the event is fetched to extract its SeriesTicker field.
+func resolveSeriesTicker(ctx context.Context, client *api.Client, ticker string, explicitSeries string) (string, error) {
+	if explicitSeries != "" {
+		return explicitSeries, nil
+	}
+
+	event, err := client.GetEvent(ctx, ticker)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve series ticker for event %s: %w", ticker, err)
+	}
+
+	if event.SeriesTicker == "" {
+		return "", fmt.Errorf("event %s has no series ticker; please provide --series explicitly", ticker)
+	}
+
+	return event.SeriesTicker, nil
 }
 
 func runMultivariateList(cmd *cobra.Command, args []string) error {

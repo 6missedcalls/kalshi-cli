@@ -41,20 +41,22 @@ var watchCmd = &cobra.Command{
 	Short: "Watch live market data and account updates",
 	Long: `Stream real-time data from Kalshi via WebSocket.
 
-Available streams:
-  ticker      Live price updates for a market
-  orderbook   Live orderbook updates for a market
-  trades      Public trades feed
-  orders      Your order updates (requires auth)
-  fills       Your fill notifications (requires auth)
-  positions   Your position changes (requires auth)
+All watch commands require authentication (API credentials).
+Press Ctrl+C to stop watching.
 
-Examples:
-  kalshi-cli watch ticker AAPL-24FEB21
-  kalshi-cli watch orderbook BTC-100K
-  kalshi-cli watch trades --market BTC-100K
+Available streams:
+  ticker      Live price updates for a market (requires <market-ticker>)
+  orderbook   Orderbook delta updates for a market (requires <market-ticker>)
+  trades      Public trades feed (optional --market filter)
+  orders      Your order status changes
+  fills       Your fill notifications
+  positions   Your position changes`,
+	Example: `  kalshi-cli watch ticker INXD-25FEB07-B5523.99
+  kalshi-cli watch orderbook INXD-25FEB07-B5523.99
+  kalshi-cli watch trades --market INXD-25FEB07-B5523.99
   kalshi-cli watch orders
-  kalshi-cli watch fills --json`,
+  kalshi-cli watch fills --json
+  kalshi-cli watch positions`,
 }
 
 var watchTickerCmd = &cobra.Command{
@@ -63,9 +65,10 @@ var watchTickerCmd = &cobra.Command{
 	Long: `Stream real-time price updates for a specific market.
 
 Output includes bid/ask prices, volume, and open interest.
-
-Example:
-  kalshi-cli watch ticker BTC-100K`,
+Use 'kalshi-cli markets list' to find available market tickers.`,
+	Example: `  kalshi-cli watch ticker INXD-25FEB07-B5523.99
+  kalshi-cli watch ticker INXD-25FEB07-B5523.99 --json
+  kalshi-cli watch ticker INXD-25FEB07-B5523.99 --plain`,
 	Args: cobra.ExactArgs(1),
 	RunE: runWatchTicker,
 }
@@ -73,12 +76,12 @@ Example:
 var watchOrderbookCmd = &cobra.Command{
 	Use:   "orderbook <market-ticker>",
 	Short: "Watch live orderbook updates for a market",
-	Long: `Stream real-time orderbook updates for a specific market.
+	Long: `Stream real-time orderbook delta updates for a specific market.
 
-Shows full orderbook snapshots and delta updates.
-
-Example:
-  kalshi-cli watch orderbook BTC-100K`,
+Shows best bid/ask, depth, and orderbook changes as they occur.
+Use 'kalshi-cli markets list' to find available market tickers.`,
+	Example: `  kalshi-cli watch orderbook INXD-25FEB07-B5523.99
+  kalshi-cli watch orderbook INXD-25FEB07-B5523.99 --json`,
 	Args: cobra.ExactArgs(1),
 	RunE: runWatchOrderbook,
 }
@@ -86,13 +89,12 @@ Example:
 var watchTradesCmd = &cobra.Command{
 	Use:   "trades",
 	Short: "Watch public trades feed",
-	Long: `Stream real-time public trades.
+	Long: `Stream real-time public trades across all markets.
 
-Optionally filter by market ticker using --market flag.
-
-Examples:
-  kalshi-cli watch trades
-  kalshi-cli watch trades --market BTC-100K`,
+Optionally filter to a single market using the --market flag.`,
+	Example: `  kalshi-cli watch trades
+  kalshi-cli watch trades --market INXD-25FEB07-B5523.99
+  kalshi-cli watch trades --json`,
 	RunE: runWatchTrades,
 }
 
@@ -101,11 +103,9 @@ var watchOrdersCmd = &cobra.Command{
 	Short: "Watch your order updates",
 	Long: `Stream real-time updates for your orders.
 
-Requires authentication. Shows order status changes,
-fills, and cancellations.
-
-Example:
-  kalshi-cli watch orders`,
+Shows order status changes, fills, and cancellations as they happen.`,
+	Example: `  kalshi-cli watch orders
+  kalshi-cli watch orders --json`,
 	RunE: runWatchOrders,
 }
 
@@ -114,11 +114,9 @@ var watchFillsCmd = &cobra.Command{
 	Short: "Watch your fill notifications",
 	Long: `Stream real-time fill notifications for your orders.
 
-Requires authentication. Shows each individual fill
-as it occurs.
-
-Example:
-  kalshi-cli watch fills`,
+Shows each individual fill as it occurs, including price, count, and taker/maker status.`,
+	Example: `  kalshi-cli watch fills
+  kalshi-cli watch fills --json`,
 	RunE: runWatchFills,
 }
 
@@ -127,11 +125,9 @@ var watchPositionsCmd = &cobra.Command{
 	Short: "Watch your position changes",
 	Long: `Stream real-time position updates.
 
-Requires authentication. Shows changes to your positions
-including realized PnL updates.
-
-Example:
-  kalshi-cli watch positions`,
+Shows changes to your positions including realized PnL, exposure, and total cost.`,
+	Example: `  kalshi-cli watch positions
+  kalshi-cli watch positions --json`,
 	RunE: runWatchPositions,
 }
 
@@ -174,8 +170,7 @@ func runWatch(channel websocket.Channel, params map[string]string) error {
 func runWatchMultiple(channels []websocket.Channel, params map[string]string) error {
 	cfg := GetConfig()
 
-	needsAuth := requiresAuth(channels)
-	opts, err := buildClientOptions(cfg, needsAuth)
+	opts, err := buildClientOptions(cfg)
 	if err != nil {
 		return err
 	}
@@ -237,31 +232,25 @@ func runWatchMultiple(channels []websocket.Channel, params map[string]string) er
 	return nil
 }
 
-func buildClientOptions(cfg *config.Config, needsAuth bool) (websocket.ClientOptions, error) {
+func buildClientOptions(cfg *config.Config) (websocket.ClientOptions, error) {
 	opts := websocket.ClientOptions{
 		URL: cfg.WebSocketURL(),
 	}
 
-	if needsAuth {
-		signer, err := getSigner(cfg)
-		if err != nil {
-			return opts, fmt.Errorf("authentication required: %w", err)
-		}
-
-		timestamp := time.Now().UTC()
-		signature, err := signer.Sign(timestamp, "GET", "/trade-api/ws/v2")
-		if err != nil {
-			return opts, fmt.Errorf("failed to sign request: %w", err)
-		}
-
-		opts.APIKeyID = signer.APIKeyID()
-		opts.Signature = signature
-		opts.Timestamp = api.TimestampHeader(timestamp)
-	} else {
-		opts.APIKeyID = "anonymous"
-		opts.Signature = "none"
-		opts.Timestamp = api.TimestampHeader(time.Now().UTC())
+	signer, err := getSigner(cfg)
+	if err != nil {
+		return opts, fmt.Errorf("authentication required for WebSocket connection: %w", err)
 	}
+
+	timestamp := time.Now().UTC()
+	signature, err := signer.Sign(timestamp, "GET", "/trade-api/ws/v2")
+	if err != nil {
+		return opts, fmt.Errorf("failed to sign request: %w", err)
+	}
+
+	opts.APIKeyID = signer.APIKeyID()
+	opts.Signature = signature
+	opts.Timestamp = api.TimestampHeader(timestamp)
 
 	return opts, nil
 }

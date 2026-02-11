@@ -100,10 +100,37 @@ func TestOrderbookRequiresAuth(t *testing.T) {
 
 // TestMarketPositionsChannelUsed verifies positions command uses correct channel
 func TestMarketPositionsChannelUsed(t *testing.T) {
-	// This test documents that positions should use ChannelMarketPositions
-	// not ChannelUserOrders + ChannelUserFills as was previously implemented
 	channel := websocket.ChannelMarketPositions
 	if channel != "market_positions" {
 		t.Errorf("expected market_positions channel, got %s", channel)
+	}
+}
+
+func TestChannelNamesMatchKalshiAPI(t *testing.T) {
+	// Document correct Kalshi WebSocket v2 channel names
+	tests := []struct {
+		name     string
+		channel  websocket.Channel
+		expected string
+	}{
+		{"ticker", websocket.ChannelMarketTicker, "ticker"},
+		{"ticker_v2", websocket.ChannelMarketTickerV2, "ticker_v2"},
+		{"orderbook_delta", websocket.ChannelOrderbook, "orderbook_delta"},
+		{"trade", websocket.ChannelPublicTrades, "trade"},
+		{"user_orders", websocket.ChannelUserOrders, "user_orders"},
+		{"fill", websocket.ChannelUserFills, "fill"},
+		{"market_positions", websocket.ChannelMarketPositions, "market_positions"},
+		{"order_group_updates", websocket.ChannelOrderGroupUpdates, "order_group_updates"},
+		{"communications", websocket.ChannelCommunications, "communications"},
+		{"market_lifecycle_v2", websocket.ChannelMarketLifecycle, "market_lifecycle_v2"},
+		{"multivariate", websocket.ChannelMultivariateLookups, "multivariate"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if string(tt.channel) != tt.expected {
+				t.Errorf("channel %s = %q, want %q", tt.name, tt.channel, tt.expected)
+			}
+		})
 	}
 }

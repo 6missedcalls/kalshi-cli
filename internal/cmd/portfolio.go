@@ -20,34 +20,48 @@ var portfolioCmd = &cobra.Command{
 	Short: "Manage your portfolio and account",
 	Long: `View and manage your Kalshi portfolio including balance, positions,
 fills, settlements, and subaccounts.`,
+	Example: `  kalshi-cli portfolio balance
+  kalshi-cli portfolio positions
+  kalshi-cli portfolio fills --limit 10
+  kalshi-cli portfolio settlements --limit 5`,
 }
 
 var balanceCmd = &cobra.Command{
 	Use:   "balance",
 	Short: "Show account balance",
-	Long:  `Display your current account balance including available balance, portfolio value, and total balance.`,
-	RunE:  runBalance,
+	Long: `Display your current account balance including available balance, portfolio value, and total balance.
+
+All values are in cents.`,
+	Example: `  kalshi-cli portfolio balance
+  kalshi-cli portfolio balance --json`,
+	RunE: runBalance,
 }
 
 var positionsCmd = &cobra.Command{
 	Use:   "positions",
 	Short: "List positions",
 	Long:  `List your current market positions with details including average cost, P&L, and exposure.`,
-	RunE:  runPositions,
+	Example: `  kalshi-cli portfolio positions
+  kalshi-cli portfolio positions --market INXD-25FEB07-B5523.99`,
+	RunE: runPositions,
 }
 
 var fillsCmd = &cobra.Command{
 	Use:   "fills",
 	Short: "List fills",
 	Long:  `List your trade fills showing executed orders and their details.`,
-	RunE:  runFills,
+	Example: `  kalshi-cli portfolio fills
+  kalshi-cli portfolio fills --limit 20`,
+	RunE: runFills,
 }
 
 var settlementsCmd = &cobra.Command{
 	Use:   "settlements",
 	Short: "List settlements",
 	Long:  `List your market settlements showing resolved positions and their outcomes.`,
-	RunE:  runSettlements,
+	Example: `  kalshi-cli portfolio settlements
+  kalshi-cli portfolio settlements --limit 10`,
+	RunE: runSettlements,
 }
 
 var subaccountsCmd = &cobra.Command{

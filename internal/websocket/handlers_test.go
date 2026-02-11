@@ -143,7 +143,7 @@ func TestParseMessage(t *testing.T) {
 	}{
 		{
 			name: "valid ticker message",
-			data: []byte(`{"type":"ticker","channel":"market_ticker","data":{"ticker":"BTC-100K"}}`),
+			data: []byte(`{"type":"ticker","channel":"ticker","data":{"ticker":"BTC-100K"}}`),
 			validate: func(t *testing.T, msg *Message) {
 				if msg.Type != "ticker" {
 					t.Errorf("expected type 'ticker', got '%s'", msg.Type)
@@ -155,7 +155,7 @@ func TestParseMessage(t *testing.T) {
 		},
 		{
 			name: "valid command response",
-			data: []byte(`{"id":1,"type":"response","msg":{"channels":["market_ticker"]}}`),
+			data: []byte(`{"id":1,"type":"response","msg":{"channels":["ticker"]}}`),
 			validate: func(t *testing.T, msg *Message) {
 				if msg.ID != 1 {
 					t.Errorf("expected id 1, got %d", msg.ID)

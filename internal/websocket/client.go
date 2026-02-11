@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -42,8 +43,14 @@ func (o *ClientOptions) Validate() error {
 	if o.APIKeyID == "" {
 		return errors.New("APIKeyID is required")
 	}
+	if o.APIKeyID == "anonymous" {
+		return errors.New("APIKeyID cannot be 'anonymous'; real credentials are required")
+	}
 	if o.Signature == "" {
 		return errors.New("Signature is required")
+	}
+	if o.Signature == "none" {
+		return errors.New("Signature cannot be 'none'; real credentials are required")
 	}
 	if o.Timestamp == "" {
 		return errors.New("Timestamp is required")
@@ -126,6 +133,18 @@ func NewClient(opts ClientOptions) *Client {
 	}
 }
 
+// buildDialOptions constructs WebSocket dial options with authentication headers.
+// Kalshi requires these headers on the HTTP upgrade request.
+func (c *Client) buildDialOptions() *websocket.DialOptions {
+	return &websocket.DialOptions{
+		HTTPHeader: http.Header{
+			"KALSHI-ACCESS-KEY":       []string{c.apiKeyID},
+			"KALSHI-ACCESS-SIGNATURE": []string{c.signature},
+			"KALSHI-ACCESS-TIMESTAMP": []string{c.timestamp},
+		},
+	}
+}
+
 // Connect establishes a WebSocket connection and authenticates
 func (c *Client) Connect(ctx context.Context) error {
 	if err := c.connect(ctx); err != nil {
@@ -147,50 +166,16 @@ func (c *Client) Connect(ctx context.Context) error {
 	return nil
 }
 
-// connect performs the actual connection and authentication
+// connect performs the actual connection.
+// Authentication is handled via HTTP headers on the WebSocket upgrade request
+// (set by buildDialOptions), not via a post-connect command.
 func (c *Client) connect(ctx context.Context) error {
-	conn, _, err := websocket.Dial(ctx, c.url, nil)
+	conn, _, err := websocket.Dial(ctx, c.url, c.buildDialOptions())
 	if err != nil {
 		return fmt.Errorf("failed to dial WebSocket: %w", err)
 	}
 
 	c.conn = conn
-
-	// Authenticate
-	authCmd := BuildAuthCommand(c.apiKeyID, c.signature, c.timestamp)
-	if err := c.sendCommand(ctx, authCmd); err != nil {
-		conn.Close(websocket.StatusNormalClosure, "auth failed")
-		return fmt.Errorf("failed to send auth command: %w", err)
-	}
-
-	// Wait for auth response
-	respChan := c.registerPendingResponse(authCmd.ID)
-	defer c.unregisterPendingResponse(authCmd.ID)
-
-	// Read auth response
-	_, data, err := conn.Read(ctx)
-	if err != nil {
-		conn.Close(websocket.StatusNormalClosure, "read failed")
-		return fmt.Errorf("failed to read auth response: %w", err)
-	}
-
-	msg, err := ParseMessage(data)
-	if err != nil {
-		conn.Close(websocket.StatusNormalClosure, "parse failed")
-		return fmt.Errorf("failed to parse auth response: %w", err)
-	}
-
-	if msg.Type == "error" {
-		conn.Close(websocket.StatusNormalClosure, "auth error")
-		return errors.New("authentication failed")
-	}
-
-	// Send to pending response channel if waiting
-	select {
-	case respChan <- msg:
-	default:
-	}
-
 	c.connected.Store(true)
 	return nil
 }

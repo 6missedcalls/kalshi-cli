@@ -21,21 +21,28 @@ var ordersCmd = &cobra.Command{
 	Long: `Manage trading orders on the Kalshi exchange.
 
 Commands for listing, creating, canceling, and amending orders.`,
+	Example: `  kalshi-cli orders list --status resting
+  kalshi-cli orders create --market INXD-25FEB07-B5523.99 --side yes --qty 10 --price 50
+  kalshi-cli orders cancel ORDER_ID`,
 }
 
 var ordersListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List orders",
 	Long:  `List orders with optional filters for status and market ticker.`,
-	RunE:  runOrdersList,
+	Example: `  kalshi-cli orders list
+  kalshi-cli orders list --status resting
+  kalshi-cli orders list --market INXD-25FEB07-B5523.99 --json`,
+	RunE: runOrdersList,
 }
 
 var ordersGetCmd = &cobra.Command{
-	Use:   "get <order-id>",
-	Short: "Get order details",
-	Long:  `Get detailed information about a specific order.`,
-	Args:  cobra.ExactArgs(1),
-	RunE:  runOrdersGet,
+	Use:     "get <order-id>",
+	Short:   "Get order details",
+	Long:    `Get detailed information about a specific order.`,
+	Example: `  kalshi-cli orders get abc123-def456-ghi789`,
+	Args:    cobra.ExactArgs(1),
+	RunE:    runOrdersGet,
 }
 
 var ordersCreateCmd = &cobra.Command{
@@ -47,6 +54,9 @@ The order preview will be shown before submission. You must confirm
 unless the --yes flag is set.
 
 Price must be between 1-99 cents.`,
+	Example: `  kalshi-cli orders create --market INXD-25FEB07-B5523.99 --side yes --qty 10 --price 50
+  kalshi-cli orders create --market INXD-25FEB07-B5523.99 --side no --qty 5 --price 30 --action sell
+  kalshi-cli orders create --market INXD-25FEB07-B5523.99 --side yes --qty 10 --price 50 --yes`,
 	RunE: runOrdersCreate,
 }
 

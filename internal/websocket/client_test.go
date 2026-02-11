@@ -112,34 +112,11 @@ func TestClientOptions_Validate(t *testing.T) {
 }
 
 func TestClient_Connect(t *testing.T) {
-	// Create test WebSocket server
+	// Create test WebSocket server — auth is via HTTP headers on upgrade,
+	// no post-connect auth command expected
 	server := newTestWSServer(t, func(conn *websocket.Conn) {
-		ctx := context.Background()
-
-		// Expect auth command
-		_, data, err := conn.Read(ctx)
-		if err != nil {
-			t.Logf("server read error: %v", err)
-			return
-		}
-
-		var cmd Command
-		if err := json.Unmarshal(data, &cmd); err != nil {
-			t.Logf("unmarshal error: %v", err)
-			return
-		}
-
-		if cmd.Cmd != CmdAuth {
-			t.Errorf("expected auth command, got %s", cmd.Cmd)
-		}
-
-		// Send auth response
-		response := Message{
-			ID:   cmd.ID,
-			Type: "response",
-		}
-		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
+		// Keep connection open
+		<-context.Background().Done()
 	})
 	defer server.Close()
 
@@ -178,22 +155,6 @@ func TestClient_Reconnect(t *testing.T) {
 		count := connectionCount
 		mu.Unlock()
 
-		ctx := context.Background()
-
-		// Read auth command
-		_, data, err := conn.Read(ctx)
-		if err != nil {
-			return
-		}
-
-		var cmd Command
-		json.Unmarshal(data, &cmd)
-
-		// Send auth response
-		response := Message{ID: cmd.ID, Type: "response"}
-		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
-
 		// First connection: close immediately to trigger reconnect
 		if count == 1 {
 			conn.Close(websocket.StatusGoingAway, "test disconnect")
@@ -201,7 +162,7 @@ func TestClient_Reconnect(t *testing.T) {
 		}
 
 		// Second connection: stay open
-		<-ctx.Done()
+		<-context.Background().Done()
 	})
 	defer server.Close()
 
@@ -243,28 +204,21 @@ func TestClient_Subscribe(t *testing.T) {
 	server := newTestWSServer(t, func(conn *websocket.Conn) {
 		ctx := context.Background()
 
-		// Handle auth
-		_, data, _ := conn.Read(ctx)
-		var cmd Command
-		json.Unmarshal(data, &cmd)
-		response := Message{ID: cmd.ID, Type: "response"}
-		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
-
-		// Handle subscribe
+		// Handle subscribe (first message after connect, no auth command)
 		_, data, err := conn.Read(ctx)
 		if err != nil {
 			return
 		}
 
+		var cmd Command
 		json.Unmarshal(data, &cmd)
 		if cmd.Cmd != CmdSubscribe {
 			t.Errorf("expected subscribe command, got %s", cmd.Cmd)
 		}
 
 		// Send subscribe response
-		response = Message{ID: cmd.ID, Type: "response"}
-		respData, _ = json.Marshal(response)
+		response := Message{ID: cmd.ID, Type: "response"}
+		respData, _ := json.Marshal(response)
 		conn.Write(ctx, websocket.MessageText, respData)
 	})
 	defer server.Close()
@@ -298,19 +252,12 @@ func TestClient_Unsubscribe(t *testing.T) {
 	server := newTestWSServer(t, func(conn *websocket.Conn) {
 		ctx := context.Background()
 
-		// Handle auth
+		// Handle subscribe
 		_, data, _ := conn.Read(ctx)
 		var cmd Command
 		json.Unmarshal(data, &cmd)
 		response := Message{ID: cmd.ID, Type: "response"}
 		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
-
-		// Handle subscribe
-		_, data, _ = conn.Read(ctx)
-		json.Unmarshal(data, &cmd)
-		response = Message{ID: cmd.ID, Type: "response"}
-		respData, _ = json.Marshal(response)
 		conn.Write(ctx, websocket.MessageText, respData)
 
 		// Handle unsubscribe
@@ -367,15 +314,7 @@ func TestClient_RegisterHandler(t *testing.T) {
 	server := newTestWSServer(t, func(conn *websocket.Conn) {
 		ctx := context.Background()
 
-		// Handle auth
-		_, data, _ := conn.Read(ctx)
-		var cmd Command
-		json.Unmarshal(data, &cmd)
-		response := Message{ID: cmd.ID, Type: "response"}
-		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
-
-		// Send a ticker message
+		// Send a ticker message immediately (no auth command to handle)
 		msg := Message{
 			Type:    "ticker",
 			Channel: ChannelMarketTicker,
@@ -431,15 +370,7 @@ func TestClient_Ping(t *testing.T) {
 	server := newTestWSServer(t, func(conn *websocket.Conn) {
 		ctx := context.Background()
 
-		// Handle auth
-		_, data, _ := conn.Read(ctx)
-		var cmd Command
-		json.Unmarshal(data, &cmd)
-		response := Message{ID: cmd.ID, Type: "response"}
-		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
-
-		// Wait for ping
+		// Wait for ping (no auth command to handle)
 		for {
 			_, data, err := conn.Read(ctx)
 			if err != nil {
@@ -492,17 +423,7 @@ func TestClient_Ping(t *testing.T) {
 
 func TestClient_Close(t *testing.T) {
 	server := newTestWSServer(t, func(conn *websocket.Conn) {
-		ctx := context.Background()
-
-		// Handle auth
-		_, data, _ := conn.Read(ctx)
-		var cmd Command
-		json.Unmarshal(data, &cmd)
-		response := Message{ID: cmd.ID, Type: "response"}
-		respData, _ := json.Marshal(response)
-		conn.Write(ctx, websocket.MessageText, respData)
-
-		<-ctx.Done()
+		<-context.Background().Done()
 	})
 	defer server.Close()
 
@@ -573,6 +494,146 @@ func TestExponentialBackoff(t *testing.T) {
 			result := calculateBackoff(tt.attempt, tt.base, tt.max)
 			if result != tt.expected {
 				t.Errorf("expected %v, got %v", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestConnect_SendsAuthHeadersOnUpgrade(t *testing.T) {
+	var receivedHeaders http.Header
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedHeaders = r.Header.Clone()
+
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			t.Logf("websocket accept error: %v", err)
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	client := NewClient(ClientOptions{
+		URL:       wsURL,
+		APIKeyID:  "my-api-key",
+		Signature: "my-signature",
+		Timestamp: "1707500000000",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := client.Connect(ctx)
+	if err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+	defer client.Close()
+
+	tests := []struct {
+		header string
+		want   string
+	}{
+		{"Kalshi-Access-Key", "my-api-key"},
+		{"Kalshi-Access-Signature", "my-signature"},
+		{"Kalshi-Access-Timestamp", "1707500000000"},
+	}
+
+	for _, tc := range tests {
+		got := receivedHeaders.Get(tc.header)
+		if got != tc.want {
+			t.Errorf("header %s = %q, want %q", tc.header, got, tc.want)
+		}
+	}
+}
+
+func TestConnect_Rejects401_WhenHeadersMissing(t *testing.T) {
+	// Server that requires auth headers on the HTTP upgrade
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Kalshi-Access-Key") == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close(websocket.StatusNormalClosure, "")
+
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+
+	client := NewClient(ClientOptions{
+		URL:       wsURL,
+		APIKeyID:  "my-key",
+		Signature: "my-sig",
+		Timestamp: "1234567890",
+	})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	// With auth headers on dial, this should succeed
+	err := client.Connect(ctx)
+	if err != nil {
+		t.Fatalf("Connect should succeed when auth headers are present, got: %v", err)
+	}
+	defer client.Close()
+}
+
+func TestClientOptions_Validate_RejectsPlaceholders(t *testing.T) {
+	tests := []struct {
+		name        string
+		opts        ClientOptions
+		expectError bool
+	}{
+		{
+			name: "rejects anonymous API key",
+			opts: ClientOptions{
+				URL:       "wss://demo-api.kalshi.co/trade-api/ws/v2",
+				APIKeyID:  "anonymous",
+				Signature: "real-sig",
+				Timestamp: "1707500000000",
+			},
+			expectError: true,
+		},
+		{
+			name: "rejects none signature",
+			opts: ClientOptions{
+				URL:       "wss://demo-api.kalshi.co/trade-api/ws/v2",
+				APIKeyID:  "real-key",
+				Signature: "none",
+				Timestamp: "1707500000000",
+			},
+			expectError: true,
+		},
+		{
+			name: "accepts real credentials",
+			opts: ClientOptions{
+				URL:       "wss://demo-api.kalshi.co/trade-api/ws/v2",
+				APIKeyID:  "real-key-id",
+				Signature: "real-base64-sig",
+				Timestamp: "1707500000000",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.opts.Validate()
+			if tt.expectError && err == nil {
+				t.Error("expected error, got nil")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
 			}
 		})
 	}

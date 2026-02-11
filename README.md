@@ -33,7 +33,7 @@ Built for traders, developers, and automated trading systems. All commands suppo
 
 - **Full Kalshi API coverage** - Markets, events, orders, portfolio, RFQs, order groups, and exchange info
 - **Real-time WebSocket streaming** - Live price tickers, orderbook updates, trades, fills, and position changes
-- **Secure authentication** - RSA-SHA256 signatures with credentials stored in your OS keyring (Keychain, Secret Service, Credential Manager)
+- **Secure authentication** - RSA-PSS signatures with credentials stored in your OS keyring (Keychain, Secret Service, Credential Manager)
 - **Bot-friendly** - JSON output, no-confirmation mode, structured exit codes, idempotent operations
 - **Demo-first** - Defaults to Kalshi's demo environment so you never accidentally trade real money
 - **Cross-platform** - macOS (Intel + Apple Silicon), Linux, and Windows
@@ -183,23 +183,23 @@ kalshi-cli --json --yes [command] [subcommand] [flags]
 
 ```bash
 # List markets with optional filters
-kalshi-cli markets list [--status open|closed|settled] [--series TICKER] [--limit 50]
+kalshi-cli markets list [--status open|closed|settled] [--series SERIES_TICKER] [--limit 50]
 
 # Get details for a specific market
-kalshi-cli markets get TICKER
+kalshi-cli markets get MARKET_TICKER
 
 # View the orderbook
-kalshi-cli markets orderbook TICKER
+kalshi-cli markets orderbook MARKET_TICKER
 
 # View recent trades
-kalshi-cli markets trades TICKER [--limit 100]
+kalshi-cli markets trades MARKET_TICKER [--limit 100]
 
-# Get OHLCV candlestick data
-kalshi-cli markets candlesticks TICKER [--period 1m|5m|15m|1h|4h|1d]
+# Get OHLCV candlestick data (requires --series)
+kalshi-cli markets candlesticks MARKET_TICKER --series SERIES_TICKER [--period 1m|1h|1d]
 
 # List and view market series
 kalshi-cli markets series list [--category CATEGORY]
-kalshi-cli markets series get TICKER
+kalshi-cli markets series get SERIES_TICKER
 ```
 
 ### Events
@@ -209,10 +209,10 @@ kalshi-cli markets series get TICKER
 kalshi-cli events list [--status active] [--limit 50]
 
 # Get event details
-kalshi-cli events get TICKER
+kalshi-cli events get EVENT_TICKER
 
-# Event candlesticks
-kalshi-cli events candlesticks TICKER [--period 1h]
+# Event candlesticks (--series auto-resolved if omitted, --start/--end required by API)
+kalshi-cli events candlesticks EVENT_TICKER --start 2025-02-01T00:00:00Z --end 2025-02-07T00:00:00Z [--period 1h] [--series SERIES_TICKER]
 
 # Multivariate events
 kalshi-cli events multivariate list
@@ -347,15 +347,19 @@ kalshi-cli exchange announcements  # Platform announcements
 
 ### Watch (WebSocket)
 
-Stream real-time data via WebSocket. Output is newline-delimited JSON with `--json`.
+Stream real-time data via WebSocket. All watch commands require authentication.
+Output is newline-delimited JSON with `--json`. Press Ctrl+C to stop.
 
 ```bash
-# Public channels (no auth required)
+# Market data streams (require a market ticker argument)
 kalshi-cli watch ticker TICKER      # Live price updates
-kalshi-cli watch orderbook TICKER   # Orderbook changes
-kalshi-cli watch trades             # Public trade feed
+kalshi-cli watch orderbook TICKER   # Orderbook delta updates
 
-# Authenticated channels
+# Trade feed (optional --market filter)
+kalshi-cli watch trades             # All public trades
+kalshi-cli watch trades --market TICKER  # Trades for one market
+
+# Account streams (no arguments needed)
 kalshi-cli watch orders             # Your order updates
 kalshi-cli watch fills              # Your fill notifications
 kalshi-cli watch positions          # Your position changes
@@ -591,7 +595,7 @@ kalshi-cli/
 - **Resty** HTTP client with automatic retry and rate-limit handling
 - **nhooyr.io/websocket** for WebSocket streaming with auto-reconnect
 - **OS keyring** for credential storage (never plaintext)
-- **RSA-SHA256 signatures** for API authentication (keys never leave your machine)
+- **RSA-PSS signatures** for API authentication (keys never leave your machine)
 - **Demo-first** - production requires explicit `--prod` flag
 
 ## Contributing

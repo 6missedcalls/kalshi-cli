@@ -15,17 +15,17 @@ func TestAllKalshiChannelsDefined(t *testing.T) {
 		channel      Channel
 		authRequired bool
 	}{
-		{"market_ticker", ChannelMarketTicker, false},
-		{"market_ticker_v2", ChannelMarketTickerV2, false},
-		{"public_trades", ChannelPublicTrades, false},
-		{"orderbook", ChannelOrderbook, true},
+		{"ticker", ChannelMarketTicker, false},
+		{"ticker_v2", ChannelMarketTickerV2, false},
+		{"trade", ChannelPublicTrades, false},
+		{"orderbook_delta", ChannelOrderbook, true},
 		{"user_orders", ChannelUserOrders, true},
-		{"user_fills", ChannelUserFills, true},
+		{"fill", ChannelUserFills, true},
 		{"market_positions", ChannelMarketPositions, true},
 		{"order_group_updates", ChannelOrderGroupUpdates, true},
 		{"communications", ChannelCommunications, true},
-		{"market_lifecycle", ChannelMarketLifecycle, false},
-		{"multivariate_lookups", ChannelMultivariateLookups, false},
+		{"market_lifecycle_v2", ChannelMarketLifecycle, false},
+		{"multivariate", ChannelMultivariateLookups, false},
 	}
 
 	for _, tc := range expectedChannels {
