@@ -410,6 +410,8 @@ func outputCandlesticks(candles []models.Candlestick) error {
 	format := GetOutputFormat()
 
 	tableFunc := func() {
+		ui.RenderCandlestickChart(candlesToChartData(candles), "Candlesticks")
+
 		headers := []string{"Time", "Open", "High", "Low", "Close", "Volume"}
 		var rows [][]string
 
@@ -575,4 +577,19 @@ func maxInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func candlesToChartData(candles []models.Candlestick) []ui.CandleData {
+	data := make([]ui.CandleData, len(candles))
+	for i, c := range candles {
+		data[i] = ui.CandleData{
+			Label:  c.PeriodEnd.Format("01/02 15:04"),
+			Open:   c.Open,
+			High:   c.High,
+			Low:    c.Low,
+			Close:  c.Close,
+			Volume: c.Volume,
+		}
+	}
+	return data
 }

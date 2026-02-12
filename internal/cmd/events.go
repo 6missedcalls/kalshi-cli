@@ -352,6 +352,8 @@ func renderEventDetails(event *models.Event) {
 }
 
 func renderCandlesticksTable(candlesticks []models.Candlestick) {
+	ui.RenderCandlestickChart(eventCandlesToChartData(candlesticks), "Event Candlesticks")
+
 	headers := []string{"Time", "Open", "High", "Low", "Close", "Volume", "OI"}
 	rows := make([][]string, 0, len(candlesticks))
 
@@ -368,6 +370,21 @@ func renderCandlesticksTable(candlesticks []models.Candlestick) {
 	}
 
 	ui.RenderTable(headers, rows)
+}
+
+func eventCandlesToChartData(candles []models.Candlestick) []ui.CandleData {
+	data := make([]ui.CandleData, len(candles))
+	for i, c := range candles {
+		data[i] = ui.CandleData{
+			Label:  c.PeriodEnd.Format("01/02 15:04"),
+			Open:   c.Open,
+			High:   c.High,
+			Low:    c.Low,
+			Close:  c.Close,
+			Volume: c.Volume,
+		}
+	}
+	return data
 }
 
 func renderMultivariateEventsTable(events []models.MultivariateEvent, cursor string) {
