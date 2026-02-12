@@ -385,12 +385,12 @@ func TestGetMultivariateEvent(t *testing.T) {
 
 func TestGetEventCandlesticks(t *testing.T) {
 	tests := []struct {
-		name           string
-		params         CandlesticksParams
-		serverResponse models.CandlesticksResponse
-		serverStatus   int
-		wantErr        bool
-		wantCount      int
+		name         string
+		params       CandlesticksParams
+		rawResponse  string // raw JSON in Kalshi v2 event candlestick format
+		serverStatus int
+		wantErr      bool
+		wantCount    int
 	}{
 		{
 			name: "returns candlesticks successfully",
@@ -399,12 +399,13 @@ func TestGetEventCandlesticks(t *testing.T) {
 				Ticker:       "ELECTION-2024",
 				Period:       "1h",
 			},
-			serverResponse: models.CandlesticksResponse{
-				Candlesticks: []models.Candlestick{
-					{Ticker: "ELECTION-2024", Open: 50, High: 55, Low: 48, Close: 52, Volume: 1000, OpenInterest: 500},
-					{Ticker: "ELECTION-2024", Open: 52, High: 58, Low: 51, Close: 56, Volume: 1200, OpenInterest: 550},
-				},
-			},
+			rawResponse: `{
+				"market_tickers": ["ELECTION-2024"],
+				"market_candlesticks": [[
+					{"end_period_ts": 1704067200, "price": {"open": 50, "high": 55, "low": 48, "close": 52}, "volume": 1000, "open_interest": 500},
+					{"end_period_ts": 1704070800, "price": {"open": 52, "high": 58, "low": 51, "close": 56}, "volume": 1200, "open_interest": 550}
+				]]
+			}`,
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 			wantCount:    2,
@@ -418,11 +419,12 @@ func TestGetEventCandlesticks(t *testing.T) {
 				StartTime:    func() *time.Time { t := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC); return &t }(),
 				EndTime:      func() *time.Time { t := time.Date(2024, 1, 2, 0, 0, 0, 0, time.UTC); return &t }(),
 			},
-			serverResponse: models.CandlesticksResponse{
-				Candlesticks: []models.Candlestick{
-					{Ticker: "FED-MAR-2024", Open: 45, High: 50, Low: 44, Close: 49, Volume: 800, OpenInterest: 400},
-				},
-			},
+			rawResponse: `{
+				"market_tickers": ["FED-MAR-2024"],
+				"market_candlesticks": [[
+					{"end_period_ts": 1704067200, "price": {"open": 45, "high": 50, "low": 44, "close": 49}, "volume": 800, "open_interest": 400}
+				]]
+			}`,
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 			wantCount:    1,
@@ -434,9 +436,7 @@ func TestGetEventCandlesticks(t *testing.T) {
 				Ticker:       "NO-DATA-EVENT",
 				Period:       "1d",
 			},
-			serverResponse: models.CandlesticksResponse{
-				Candlesticks: []models.Candlestick{},
-			},
+			rawResponse:  `{"market_tickers": [], "market_candlesticks": []}`,
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 			wantCount:    0,
@@ -448,9 +448,9 @@ func TestGetEventCandlesticks(t *testing.T) {
 				Ticker:       "INVALID-EVENT",
 				Period:       "1h",
 			},
-			serverResponse: models.CandlesticksResponse{},
-			serverStatus:   http.StatusNotFound,
-			wantErr:        true,
+			rawResponse:  `{}`,
+			serverStatus: http.StatusNotFound,
+			wantErr:      true,
 		},
 		{
 			name: "handles server error",
@@ -459,9 +459,9 @@ func TestGetEventCandlesticks(t *testing.T) {
 				Ticker:       "ERROR-EVENT",
 				Period:       "1h",
 			},
-			serverResponse: models.CandlesticksResponse{},
-			serverStatus:   http.StatusInternalServerError,
-			wantErr:        true,
+			rawResponse:  `{}`,
+			serverStatus: http.StatusInternalServerError,
+			wantErr:      true,
 		},
 	}
 
@@ -499,7 +499,7 @@ func TestGetEventCandlesticks(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
-					json.NewEncoder(w).Encode(tt.serverResponse)
+					w.Write([]byte(tt.rawResponse))
 				}
 			}))
 			defer server.Close()

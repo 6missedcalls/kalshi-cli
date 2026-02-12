@@ -74,7 +74,9 @@ func (c *Client) GetEvent(ctx context.Context, ticker string) (*models.Event, er
 	return &resp.Event, nil
 }
 
-// GetEventCandlesticks retrieves candlestick data for an event
+// GetEventCandlesticks retrieves candlestick data for an event.
+// The event endpoint returns market_tickers + market_candlesticks (array of arrays).
+// This method flattens all markets' candlesticks into a single slice.
 func (c *Client) GetEventCandlesticks(ctx context.Context, params CandlesticksParams) ([]models.Candlestick, error) {
 	queryParams := make(map[string]string)
 
@@ -90,12 +92,12 @@ func (c *Client) GetEventCandlesticks(ctx context.Context, params CandlesticksPa
 
 	path := TradeAPIPrefix + "/series/" + params.SeriesTicker + "/events/" + params.Ticker + "/candlesticks" + BuildQueryString(queryParams)
 
-	var resp models.CandlesticksResponse
+	var resp models.EventCandlesticksResponse
 	if err := c.DoRequest(ctx, "GET", path, nil, &resp); err != nil {
 		return nil, err
 	}
 
-	return resp.Candlesticks, nil
+	return resp.AllCandlesticks(), nil
 }
 
 // ListMultivariateEvents retrieves a list of multivariate events

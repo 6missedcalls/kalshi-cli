@@ -417,32 +417,33 @@ func TestGetTrades(t *testing.T) {
 
 func TestGetCandlesticks(t *testing.T) {
 	tests := []struct {
-		name           string
-		params         GetCandlesticksParams
-		serverResponse models.CandlesticksResponse
-		serverStatus   int
-		wantErr        bool
-		wantCount      int
+		name         string
+		params       GetCandlesticksParams
+		rawResponse  string // raw JSON in Kalshi v2 format
+		serverStatus int
+		wantErr      bool
+		wantCount    int
 	}{
 		{
 			name:   "returns candlesticks successfully",
 			params: GetCandlesticksParams{SeriesTicker: "BTC-SERIES", Ticker: "BTC-100K", Period: "1h"},
-			serverResponse: models.CandlesticksResponse{
-				Candlesticks: []models.Candlestick{
-					{Ticker: "BTC-100K", Open: 45, High: 48, Low: 44, Close: 47, Volume: 1000},
-					{Ticker: "BTC-100K", Open: 47, High: 50, Low: 46, Close: 49, Volume: 1200},
-				},
-			},
+			rawResponse: `{
+				"ticker": "BTC-100K",
+				"candlesticks": [
+					{"end_period_ts": 1704067200, "price": {"open": 45, "high": 48, "low": 44, "close": 47}, "volume": 1000, "open_interest": 0},
+					{"end_period_ts": 1704070800, "price": {"open": 47, "high": 50, "low": 46, "close": 49}, "volume": 1200, "open_interest": 0}
+				]
+			}`,
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 			wantCount:    2,
 		},
 		{
-			name:           "handles invalid ticker",
-			params:         GetCandlesticksParams{SeriesTicker: "INVALID-SERIES", Ticker: "INVALID", Period: "1h"},
-			serverResponse: models.CandlesticksResponse{},
-			serverStatus:   http.StatusNotFound,
-			wantErr:        true,
+			name:         "handles invalid ticker",
+			params:       GetCandlesticksParams{SeriesTicker: "INVALID-SERIES", Ticker: "INVALID", Period: "1h"},
+			rawResponse:  `{}`,
+			serverStatus: http.StatusNotFound,
+			wantErr:      true,
 		},
 		{
 			name: "returns candlesticks with time range",
@@ -453,11 +454,12 @@ func TestGetCandlesticks(t *testing.T) {
 				StartTime:    time.Now().Add(-24 * time.Hour).Unix(),
 				EndTime:      time.Now().Unix(),
 			},
-			serverResponse: models.CandlesticksResponse{
-				Candlesticks: []models.Candlestick{
-					{Ticker: "ETH-5K", Open: 30, High: 32, Low: 29, Close: 31},
-				},
-			},
+			rawResponse: `{
+				"ticker": "ETH-5K",
+				"candlesticks": [
+					{"end_period_ts": 1704067200, "price": {"open": 30, "high": 32, "low": 29, "close": 31}, "volume": 0, "open_interest": 0}
+				]
+			}`,
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 			wantCount:    1,
@@ -479,7 +481,7 @@ func TestGetCandlesticks(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
-					json.NewEncoder(w).Encode(tt.serverResponse)
+					w.Write([]byte(tt.rawResponse))
 				}
 			}))
 			defer server.Close()
@@ -873,13 +875,12 @@ func TestGetTrades_WithTimeFilters(t *testing.T) {
 // TDD RED: Test for batch candlesticks endpoint
 func TestGetBatchCandlesticks(t *testing.T) {
 	tests := []struct {
-		name           string
-		params         GetBatchCandlesticksParams
-		serverResponse models.BatchCandlesticksResponse
-		serverStatus   int
-		wantErr        bool
-		wantCount      int
-		skipServer     bool // for client-side validation tests
+		name         string
+		params       GetBatchCandlesticksParams
+		rawResponse  string // raw JSON in Kalshi v2 format
+		serverStatus int
+		wantErr      bool
+		wantCount    int
 	}{
 		{
 			name: "returns batch candlesticks for multiple tickers",
@@ -887,28 +888,28 @@ func TestGetBatchCandlesticks(t *testing.T) {
 				Tickers: []string{"BTC-100K", "ETH-5K", "SOL-500"},
 				Period:  "1h",
 			},
-			serverResponse: models.BatchCandlesticksResponse{
-				MarketCandlesticks: []models.MarketCandlesticks{
+			rawResponse: `{
+				"market_candlesticks": [
 					{
-						Ticker: "BTC-100K",
-						Candlesticks: []models.Candlestick{
-							{Ticker: "BTC-100K", Open: 45, High: 48, Low: 44, Close: 47},
-						},
+						"ticker": "BTC-100K",
+						"candlesticks": [
+							{"end_period_ts": 1704067200, "price": {"open": 45, "high": 48, "low": 44, "close": 47}, "volume": 0, "open_interest": 0}
+						]
 					},
 					{
-						Ticker: "ETH-5K",
-						Candlesticks: []models.Candlestick{
-							{Ticker: "ETH-5K", Open: 30, High: 32, Low: 29, Close: 31},
-						},
+						"ticker": "ETH-5K",
+						"candlesticks": [
+							{"end_period_ts": 1704067200, "price": {"open": 30, "high": 32, "low": 29, "close": 31}, "volume": 0, "open_interest": 0}
+						]
 					},
 					{
-						Ticker: "SOL-500",
-						Candlesticks: []models.Candlestick{
-							{Ticker: "SOL-500", Open: 55, High: 58, Low: 54, Close: 57},
-						},
-					},
-				},
-			},
+						"ticker": "SOL-500",
+						"candlesticks": [
+							{"end_period_ts": 1704067200, "price": {"open": 55, "high": 58, "low": 54, "close": 57}, "volume": 0, "open_interest": 0}
+						]
+					}
+				]
+			}`,
 			serverStatus: http.StatusOK,
 			wantErr:      false,
 			wantCount:    3,
@@ -919,9 +920,9 @@ func TestGetBatchCandlesticks(t *testing.T) {
 				Tickers: []string{"INVALID"},
 				Period:  "1h",
 			},
-			serverResponse: models.BatchCandlesticksResponse{},
-			serverStatus:   http.StatusInternalServerError,
-			wantErr:        true,
+			rawResponse:  `{}`,
+			serverStatus: http.StatusInternalServerError,
+			wantErr:      true,
 		},
 	}
 
@@ -949,7 +950,7 @@ func TestGetBatchCandlesticks(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(tt.serverStatus)
 				if tt.serverStatus == http.StatusOK {
-					json.NewEncoder(w).Encode(tt.serverResponse)
+					w.Write([]byte(tt.rawResponse))
 				}
 			}))
 			defer server.Close()

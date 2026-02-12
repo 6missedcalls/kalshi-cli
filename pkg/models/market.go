@@ -1,6 +1,9 @@
 package models
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 // Market represents a Kalshi prediction market
 type Market struct {
@@ -90,21 +93,113 @@ type TradesResponse struct {
 	Cursor string  `json:"cursor"`
 }
 
-// Candlestick represents OHLCV data
+// Candlestick represents OHLCV data.
+// The Kalshi v2 API returns candlesticks with a nested "price" object
+// and "end_period_ts" as a unix timestamp. UnmarshalJSON handles this.
 type Candlestick struct {
-	Ticker     string    `json:"ticker"`
-	Open       int       `json:"open"`
-	High       int       `json:"high"`
-	Low        int       `json:"low"`
-	Close      int       `json:"close"`
-	Volume     int       `json:"volume"`
-	OpenInterest int     `json:"open_interest"`
-	PeriodEnd  time.Time `json:"period_end"`
+	Ticker       string    `json:"-"`
+	Open         int       `json:"-"`
+	High         int       `json:"-"`
+	Low          int       `json:"-"`
+	Close        int       `json:"-"`
+	Volume       int       `json:"volume"`
+	OpenInterest int       `json:"open_interest"`
+	PeriodEnd    time.Time `json:"-"`
 }
 
-// CandlesticksResponse is the API response for candlesticks
+// candlestickJSON is the structure used for JSON output (--json flag)
+type candlestickJSON struct {
+	Ticker       string `json:"ticker,omitempty"`
+	Open         int    `json:"open"`
+	High         int    `json:"high"`
+	Low          int    `json:"low"`
+	Close        int    `json:"close"`
+	Volume       int    `json:"volume"`
+	OpenInterest int    `json:"open_interest"`
+	PeriodEnd    string `json:"period_end,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler for Candlestick.
+// Produces clean JSON output for --json flag.
+func (c Candlestick) MarshalJSON() ([]byte, error) {
+	out := candlestickJSON{
+		Ticker:       c.Ticker,
+		Open:         c.Open,
+		High:         c.High,
+		Low:          c.Low,
+		Close:        c.Close,
+		Volume:       c.Volume,
+		OpenInterest: c.OpenInterest,
+	}
+	if !c.PeriodEnd.IsZero() {
+		out.PeriodEnd = c.PeriodEnd.Format(time.RFC3339)
+	}
+	return json.Marshal(out)
+}
+
+// candlestickWire is the raw Kalshi v2 API wire format
+type candlestickWire struct {
+	EndPeriodTs  int64 `json:"end_period_ts"`
+	Price        struct {
+		Open  int `json:"open"`
+		High  int `json:"high"`
+		Low   int `json:"low"`
+		Close int `json:"close"`
+	} `json:"price"`
+	Volume       int `json:"volume"`
+	OpenInterest int `json:"open_interest"`
+}
+
+// UnmarshalJSON implements json.Unmarshaler for Candlestick.
+// Extracts OHLC from the nested "price" object and converts end_period_ts.
+func (c *Candlestick) UnmarshalJSON(data []byte) error {
+	var w candlestickWire
+	if err := json.Unmarshal(data, &w); err != nil {
+		return err
+	}
+
+	c.Open = w.Price.Open
+	c.High = w.Price.High
+	c.Low = w.Price.Low
+	c.Close = w.Price.Close
+	c.Volume = w.Volume
+	c.OpenInterest = w.OpenInterest
+
+	if w.EndPeriodTs > 0 {
+		c.PeriodEnd = time.Unix(w.EndPeriodTs, 0).UTC()
+	}
+
+	return nil
+}
+
+// CandlesticksResponse is the API response for market candlesticks
 type CandlesticksResponse struct {
 	Candlesticks []Candlestick `json:"candlesticks"`
+}
+
+// EventCandlesticksResponse is the API response for event candlesticks.
+// The event endpoint returns market_tickers + market_candlesticks (array of arrays).
+type EventCandlesticksResponse struct {
+	MarketTickers      []string        `json:"market_tickers"`
+	MarketCandlesticks [][]Candlestick `json:"market_candlesticks"`
+	AdjustedEndTs      int64           `json:"adjusted_end_ts,omitempty"`
+}
+
+// AllCandlesticks flattens all markets' candlesticks into a single slice,
+// setting the Ticker field from the corresponding market_tickers entry.
+func (r *EventCandlesticksResponse) AllCandlesticks() []Candlestick {
+	var result []Candlestick
+	for i, marketCandles := range r.MarketCandlesticks {
+		ticker := ""
+		if i < len(r.MarketTickers) {
+			ticker = r.MarketTickers[i]
+		}
+		for _, c := range marketCandles {
+			c.Ticker = ticker
+			result = append(result, c)
+		}
+	}
+	return result
 }
 
 // Series represents a market series
